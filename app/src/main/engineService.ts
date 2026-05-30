@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { TaskStore, ensureBuiltins, executorsInfo, getExecutor, loadConfig, toTaskView } from "@engine";
-import type { StartArgs, StoreEvent } from "@engine";
+import { Orchestrator, RunStore, TaskStore, ensureBuiltins, executorsInfo, getExecutor, loadConfig, plan, review, toTaskView } from "@engine";
+import type { Plan, Run, RunEvent, StartArgs, StoreEvent } from "@engine";
 import type {
   ApplyResult,
   ConfigView,
@@ -9,6 +9,7 @@ import type {
   ProjectInfo,
   ResumeInput,
   ReviewInput,
+  RunStartInput,
   StartInput,
   StartResult,
   Stats,
@@ -46,15 +47,72 @@ const REVIEW_SCHEMA = {
 export class EngineService {
   private readonly cfg = loadConfig();
   private readonly store: TaskStore;
+  private readonly runStore: RunStore;
+  private readonly orch: Orchestrator;
   private projectCwd = process.cwd();
 
   constructor() {
     ensureBuiltins();
     this.store = new TaskStore(this.cfg);
+    this.runStore = new RunStore(this.cfg.stateDir);
+    this.orch = new Orchestrator({
+      runStore: this.runStore,
+      taskStore: this.store,
+      getExecutor: (name, fallback) => getExecutor(name, fallback),
+      planner: (goal, opts) => plan(goal, opts),
+      reviewer: (phase, diff, opts) => review(phase, diff, opts),
+      cfg: this.cfg,
+    });
   }
 
   onChange(cb: (e: StoreEvent) => void): () => void {
     return this.store.on(cb);
+  }
+
+  onRunChange(cb: (e: RunEvent) => void): () => void {
+    return this.runStore.on(cb);
+  }
+
+  // ---- orchestrated runs ----
+  runStart(input: RunStartInput): Run {
+    return this.orch.startRun({
+      goal: input.goal,
+      cwd: input.cwd ?? this.projectCwd,
+      gateMode: input.gateMode,
+      maxReviseIters: input.maxReviseIters,
+      executor: input.executor,
+      sandbox: this.cfg.defaultSandbox,
+      plannerModel: input.plannerModel,
+      reviewerModel: input.reviewerModel,
+      executorModel: input.executorModel,
+    });
+  }
+  runGet(runId: string): Run | null {
+    return this.runStore.get(runId) ?? null;
+  }
+  runList(): Run[] {
+    return this.runStore.list();
+  }
+  runApprovePlan(runId: string): void {
+    this.orch.approvePlan(runId);
+  }
+  runEditPlan(runId: string, p: Plan): void {
+    this.orch.editPlan(runId, p);
+  }
+  runApprovePhase(runId: string): void {
+    this.orch.approvePhase(runId);
+  }
+  runPause(runId: string): void {
+    this.orch.pause(runId);
+  }
+  runResume(runId: string): void {
+    this.orch.resume(runId);
+  }
+  runAbort(runId: string): Promise<void> {
+    return this.orch.abort(runId);
+  }
+  runIntervene(runId: string, instruction: string): void {
+    this.orch.intervene(runId, instruction);
   }
 
   async start(input: StartInput): Promise<StartResult> {

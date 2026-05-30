@@ -1,6 +1,9 @@
 // The IPC contract shared by main, preload, and renderer.
-// Types are declared locally (mirroring the engine) so the renderer/preload
-// never import Node engine code — only the main process talks to @engine.
+// Single-task view types are declared locally (mirroring the engine). Run/plan
+// types are imported type-only from @engine (erased at build; no runtime pull).
+import type { Finding, GateMode, PhaseRun, PhaseStatus, Plan, PlanPhase, Run, RunStatus, Verdict } from "@engine";
+
+export type { Finding, GateMode, PhaseRun, PhaseStatus, Plan, PlanPhase, Run, RunStatus, Verdict };
 
 export type SandboxMode = "read-only" | "workspace-write" | "danger-full-access";
 export type Isolation = "inplace" | "worktree";
@@ -136,6 +139,17 @@ export interface ConfigView {
   logLevel: string;
 }
 
+export interface RunStartInput {
+  goal: string;
+  cwd?: string;
+  gateMode?: GateMode;
+  maxReviseIters?: number;
+  executor?: string;
+  plannerModel?: string;
+  reviewerModel?: string;
+  executorModel?: string;
+}
+
 export interface AgentApi {
   start(input: StartInput): Promise<StartResult>;
   status(taskId?: string): Promise<TaskView | StatusSummary | null>;
@@ -154,6 +168,18 @@ export interface AgentApi {
   setProject(cwd: string): Promise<ProjectInfo>;
   onUpdate(cb: (taskId: string) => void): () => void;
   onActivity(cb: (taskId: string, event: EventView) => void): () => void;
+  // ---- orchestrated runs (Claude plans/reviews <-> Codex executes) ----
+  runStart(input: RunStartInput): Promise<Run>;
+  runGet(runId: string): Promise<Run | null>;
+  runList(): Promise<Run[]>;
+  runApprovePlan(runId: string): Promise<void>;
+  runEditPlan(runId: string, plan: Plan): Promise<void>;
+  runApprovePhase(runId: string): Promise<void>;
+  runPause(runId: string): Promise<void>;
+  runResume(runId: string): Promise<void>;
+  runAbort(runId: string): Promise<void>;
+  runIntervene(runId: string, instruction: string): Promise<void>;
+  onRunUpdate(cb: (runId: string) => void): () => void;
 }
 
 export const CHANNELS = {
@@ -174,4 +200,15 @@ export const CHANNELS = {
   setProject: "agent:setProject",
   evtUpdate: "agent:update",
   evtActivity: "agent:activity",
+  runStart: "run:start",
+  runGet: "run:get",
+  runList: "run:list",
+  runApprovePlan: "run:approvePlan",
+  runEditPlan: "run:editPlan",
+  runApprovePhase: "run:approvePhase",
+  runPause: "run:pause",
+  runResume: "run:resume",
+  runAbort: "run:abort",
+  runIntervene: "run:intervene",
+  evtRun: "run:update",
 } as const;

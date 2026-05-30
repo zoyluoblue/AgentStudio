@@ -27,6 +27,21 @@ const api: AgentApi = {
     ipcRenderer.on(CHANNELS.evtActivity, h);
     return () => ipcRenderer.off(CHANNELS.evtActivity, h);
   },
+  runStart: (input) => ipcRenderer.invoke(CHANNELS.runStart, input),
+  runGet: (runId) => ipcRenderer.invoke(CHANNELS.runGet, runId),
+  runList: () => ipcRenderer.invoke(CHANNELS.runList),
+  runApprovePlan: (runId) => ipcRenderer.invoke(CHANNELS.runApprovePlan, runId),
+  runEditPlan: (runId, plan) => ipcRenderer.invoke(CHANNELS.runEditPlan, { runId, plan }),
+  runApprovePhase: (runId) => ipcRenderer.invoke(CHANNELS.runApprovePhase, runId),
+  runPause: (runId) => ipcRenderer.invoke(CHANNELS.runPause, runId),
+  runResume: (runId) => ipcRenderer.invoke(CHANNELS.runResume, runId),
+  runAbort: (runId) => ipcRenderer.invoke(CHANNELS.runAbort, runId),
+  runIntervene: (runId, instruction) => ipcRenderer.invoke(CHANNELS.runIntervene, { runId, instruction }),
+  onRunUpdate: (cb) => {
+    const h = (_e: IpcRendererEvent, runId: string) => cb(runId);
+    ipcRenderer.on(CHANNELS.evtRun, h);
+    return () => ipcRenderer.off(CHANNELS.evtRun, h);
+  },
 };
 
 contextBridge.exposeInMainWorld("agent", api);

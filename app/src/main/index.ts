@@ -81,8 +81,13 @@ function createWindow(): void {
     }
   });
 
+  const offRun = engine.onRunChange((e) => {
+    if (win && !win.isDestroyed()) win.webContents.send(CHANNELS.evtRun, e.runId);
+  });
+
   win.on("closed", () => {
     off();
+    offRun();
     win = null;
   });
 }
@@ -100,6 +105,16 @@ function registerIpc(): void {
   ipcMain.handle(CHANNELS.executors, () => engine.executors());
   ipcMain.handle(CHANNELS.stats, () => engine.stats());
   ipcMain.handle(CHANNELS.getConfig, () => engine.getConfig());
+  ipcMain.handle(CHANNELS.runStart, (_e, input) => engine.runStart(input));
+  ipcMain.handle(CHANNELS.runGet, (_e, runId) => engine.runGet(runId));
+  ipcMain.handle(CHANNELS.runList, () => engine.runList());
+  ipcMain.handle(CHANNELS.runApprovePlan, (_e, runId) => engine.runApprovePlan(runId));
+  ipcMain.handle(CHANNELS.runEditPlan, (_e, { runId, plan }) => engine.runEditPlan(runId, plan));
+  ipcMain.handle(CHANNELS.runApprovePhase, (_e, runId) => engine.runApprovePhase(runId));
+  ipcMain.handle(CHANNELS.runPause, (_e, runId) => engine.runPause(runId));
+  ipcMain.handle(CHANNELS.runResume, (_e, runId) => engine.runResume(runId));
+  ipcMain.handle(CHANNELS.runAbort, (_e, runId) => engine.runAbort(runId));
+  ipcMain.handle(CHANNELS.runIntervene, (_e, { runId, instruction }) => engine.runIntervene(runId, instruction));
   ipcMain.handle(CHANNELS.getProject, () => engine.getProject());
   ipcMain.handle(CHANNELS.setProject, (_e, cwd) => engine.setProject(cwd));
   ipcMain.handle(CHANNELS.pickProject, async () => {

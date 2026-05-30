@@ -23,6 +23,7 @@ export function buildExecutePrompt(run: Run, pr: PhaseRun, idx: number): string 
     p.filesLikely && p.filesLikely.length ? `Files likely involved: ${p.filesLikely.join(", ")}` : "",
     run.intervene ? `Extra instructions from the human: ${run.intervene}` : "",
     "",
+    "Environment: the shell is NON-interactive but HAS network access. Use non-interactive flags (e.g. `create-next-app --yes`, `npm install`, `pip install`) and never wait for interactive prompts. Actually create the files/install the deps — do not just describe them.",
     "Make the changes now, focused on this phase.",
   ]
     .filter(Boolean)

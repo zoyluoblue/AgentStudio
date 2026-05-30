@@ -37,6 +37,11 @@ export function buildExecArgv(args: StartArgs, opts: ArgvOptions): ArgvResult {
     args.cwd,
   ];
 
+  // Enable network in the workspace-write sandbox so installs (npm/pip/...) work.
+  if (args.sandbox === "workspace-write" && process.env.AGENTCONNECTOR_CODEX_NO_NETWORK !== "1") {
+    argv.push("-c", "sandbox_workspace_write.network_access=true");
+  }
+
   if (args.model) argv.push("-m", args.model);
   for (const dir of args.addDirs ?? []) argv.push("--add-dir", dir);
 
@@ -72,6 +77,10 @@ export function buildResumeArgv(args: StartArgs, opts: ArgvOptions, sessionId: s
     `sandbox_mode="${args.sandbox}"`,
     "--skip-git-repo-check",
   ];
+
+  if (args.sandbox === "workspace-write" && process.env.AGENTCONNECTOR_CODEX_NO_NETWORK !== "1") {
+    argv.push("-c", "sandbox_workspace_write.network_access=true");
+  }
 
   if (args.model) argv.push("-m", args.model);
 

@@ -8,6 +8,7 @@ export type Isolation = "inplace" | "worktree";
 export interface Config {
   defaultExecutor: string;
   defaultSandbox: SandboxMode;
+  runSandbox: SandboxMode; // sandbox for orchestrated runs (needs installs -> full access)
   defaultIsolation: Isolation;
   maxConcurrent: number;
   maxRetries: number; // default auto-retry attempts on failure
@@ -60,6 +61,7 @@ export function loadConfig(): Config {
   return {
     defaultExecutor: process.env.AGENTCONNECTOR_DEFAULT_EXECUTOR || f.defaultExecutor || "codex",
     defaultSandbox: envSandbox("AGENTCONNECTOR_DEFAULT_SANDBOX", f.defaultSandbox ?? "workspace-write"),
+    runSandbox: envSandbox("AGENTCONNECTOR_RUN_SANDBOX", f.runSandbox ?? "danger-full-access"),
     defaultIsolation: envIsolation("AGENTCONNECTOR_ISOLATION", f.defaultIsolation ?? "inplace"),
     maxConcurrent: envInt("AGENTCONNECTOR_MAX_CONCURRENT", f.maxConcurrent ?? 4),
     maxRetries: envInt("AGENTCONNECTOR_MAX_RETRIES", f.maxRetries ?? 0),

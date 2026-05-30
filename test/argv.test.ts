@@ -50,6 +50,13 @@ describe("buildExecArgv", () => {
     const { argv } = buildExecArgv(base({ prompt: "rm -rf / ; echo $(whoami)" }), { tmpDir: "/tmp/x" });
     expect(argv.join(" ")).not.toContain("whoami");
   });
+
+  it("enables network for workspace-write (installs) but not for read-only", () => {
+    const ws = buildExecArgv(base({ sandbox: "workspace-write" }), { tmpDir: "/tmp/x" });
+    expect(ws.argv.join(" ")).toContain("sandbox_workspace_write.network_access=true");
+    const ro = buildExecArgv(base({ sandbox: "read-only" }), { tmpDir: "/tmp/x" });
+    expect(ro.argv.join(" ")).not.toContain("network_access");
+  });
 });
 
 describe("buildResumeArgv", () => {

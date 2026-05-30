@@ -131,6 +131,7 @@ export interface StatusSummary extends Stats {
 export interface ConfigView {
   defaultExecutor: string;
   defaultSandbox: SandboxMode;
+  runSandbox: SandboxMode;
   defaultIsolation: Isolation;
   maxConcurrent: number;
   maxRetries: number;

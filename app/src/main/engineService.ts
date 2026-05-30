@@ -81,7 +81,7 @@ export class EngineService {
       gateMode: input.gateMode,
       maxReviseIters: input.maxReviseIters,
       executor: input.executor,
-      sandbox: this.cfg.defaultSandbox,
+      sandbox: this.cfg.runSandbox,
       plannerModel: input.plannerModel,
       reviewerModel: input.reviewerModel,
       executorModel: input.executorModel,
@@ -174,6 +174,7 @@ export class EngineService {
     return {
       defaultExecutor: this.cfg.defaultExecutor,
       defaultSandbox: this.cfg.defaultSandbox,
+      runSandbox: this.cfg.runSandbox,
       defaultIsolation: this.cfg.defaultIsolation,
       maxConcurrent: this.cfg.maxConcurrent,
       maxRetries: this.cfg.maxRetries,

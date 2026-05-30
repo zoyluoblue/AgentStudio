@@ -34,6 +34,7 @@ export function Settings({
             <div className="kv col">
               <span>默认执行器 <b>{config.defaultExecutor}</b></span>
               <span>默认沙箱 <b>{config.defaultSandbox}</b></span>
+              <span>Task 执行沙箱 <b>{config.runSandbox}</b>（装包/脚手架需 full access；改 AGENTCONNECTOR_RUN_SANDBOX）</span>
               <span>默认隔离 <b>{config.defaultIsolation}</b></span>
               <span>最大并发 <b>{config.maxConcurrent}</b></span>
               <span>默认重试 <b>{config.maxRetries}</b></span>

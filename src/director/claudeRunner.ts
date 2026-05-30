@@ -76,23 +76,44 @@ export function parseClaudeEnvelope(out: string, err: string, code: number | nul
   const text = typeof resultField === "string" ? resultField : resultField !== undefined ? JSON.stringify(resultField) : "";
 
   let structured: unknown;
-  if (resultField !== undefined && resultField !== null) {
-    if (typeof resultField === "object") structured = resultField;
-    else if (typeof resultField === "string") {
-      const s = extractJson(resultField);
-      if (s !== undefined) structured = s;
+  if (typeof resultField === "object" && resultField !== null) structured = resultField;
+  else if (typeof resultField === "string" && resultField.trim()) structured = extractJson(resultField);
+  // Some configurations deliver structured output in a side field, not `result`.
+  if (structured === undefined) {
+    for (const k of ["structured_output", "structuredOutput", "output", "structured"]) {
+      const alt = o[k];
+      if (alt && typeof alt === "object") {
+        structured = alt;
+        break;
+      }
+      if (typeof alt === "string" && alt.trim()) {
+        const a = extractJson(alt);
+        if (a !== undefined) {
+          structured = a;
+          break;
+        }
+      }
     }
   }
 
-  return {
-    ok: !isError && code === 0,
-    text,
-    structured,
-    sessionId: typeof o["session_id"] === "string" ? (o["session_id"] as string) : undefined,
-    costUsd: typeof o["total_cost_usd"] === "number" ? (o["total_cost_usd"] as number) : undefined,
-    raw: out,
-    error: isError ? String(o["error"] ?? text ?? "claude error") : undefined,
-  };
+  const sessionId = typeof o["session_id"] === "string" ? (o["session_id"] as string) : undefined;
+  const costUsd = typeof o["total_cost_usd"] === "number" ? (o["total_cost_usd"] as number) : undefined;
+
+  if (isError) return { ok: false, text, structured, sessionId, costUsd, raw: out, error: String(o["error"] ?? text ?? "claude error") };
+  if (code !== 0) return { ok: false, text, structured, sessionId, costUsd, raw: out, error: `claude exited with code ${code}` };
+  if (structured === undefined && !text.trim()) {
+    const usage = o["usage"] as Record<string, unknown> | undefined;
+    return {
+      ok: false,
+      text: "",
+      structured,
+      sessionId,
+      costUsd,
+      raw: out,
+      error: `claude returned an empty result (turns=${o["num_turns"]}, output_tokens=${usage?.["output_tokens"]}); it likely used tools without emitting a final answer.`,
+    };
+  }
+  return { ok: true, text, structured, sessionId, costUsd, raw: out };
 }
 
 /** Run `claude -p` headlessly with optional inline schema + read-only enforcement. */
@@ -107,7 +128,26 @@ export async function runClaude(opts: ClaudeRunOptions): Promise<ClaudeRunResult
   if (opts.schema !== undefined) argv.push("--json-schema", JSON.stringify(opts.schema));
   if (opts.model) argv.push("--model", opts.model);
   argv.push("--add-dir", opts.cwd);
-  if (opts.readOnly !== false) argv.push("--disallowedTools", "Edit", "Write", "NotebookEdit");
+  // For planning/review we disable ALL tools so Claude answers directly in one
+  // turn (with JSON) instead of going agentic — which returned empty results.
+  if (opts.readOnly !== false) {
+    argv.push(
+      "--disallowedTools",
+      "Bash",
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "Read",
+      "Glob",
+      "Grep",
+      "Task",
+      "Agent",
+      "WebFetch",
+      "WebSearch",
+      "TodoWrite",
+      "MultiEdit",
+    );
+  }
 
   return new Promise<ClaudeRunResult>((resolve) => {
     const child = spawn(bin, argv, { cwd: opts.cwd, stdio: ["ignore", "pipe", "pipe"], env: process.env });

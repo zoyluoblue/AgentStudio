@@ -1,5 +1,5 @@
 import { type ClaudeRunResult, runClaude } from "./claudeRunner.js";
-import { coercePlan, PLAN_SCHEMA, type Plan } from "./schemas.js";
+import { coercePlan, type Plan } from "./schemas.js";
 
 export interface PlannerOptions {
   cwd: string;
@@ -39,7 +39,7 @@ export function buildPlanPrompt(goal: string): string {
     "  ]",
     "}",
     "",
-    "Rules: 2-6 ordered phases, each independently reviewable and building on prior ones. You may inspect the repository for context. Output JSON ONLY.",
+    "Rules: 2-6 ordered phases, each independently reviewable and building on prior ones. Plan from the goal directly. Output JSON ONLY.",
     "",
     "GOAL:",
     goal,
@@ -55,7 +55,6 @@ export async function plan(goal: string, opts: PlannerOptions): Promise<PlanResu
     const r = await runClaude({
       prompt: buildPlanPrompt(goal) + reinforce,
       cwd: opts.cwd,
-      schema: PLAN_SCHEMA,
       systemPrompt:
         "You are a structured-output engine. Respond with exactly one JSON object and nothing else — no prose, no markdown, no code fences. Begin with { and end with }.",
       model: opts.model,

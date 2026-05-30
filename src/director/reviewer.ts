@@ -1,5 +1,5 @@
 import { type ClaudeRunResult, runClaude } from "./claudeRunner.js";
-import { coerceVerdict, type PlanPhase, type Verdict, VERDICT_SCHEMA } from "./schemas.js";
+import { coerceVerdict, type PlanPhase, type Verdict } from "./schemas.js";
 
 export interface ReviewerOptions {
   cwd: string;
@@ -31,7 +31,7 @@ export function buildReviewPrompt(phase: PlanPhase, diff: string): string {
     '  "requiredChanges": ["concrete change the implementer must make"]',
     "}",
     "",
-    "Set pass=true ONLY if ALL acceptance criteria are clearly met and the change is correct; otherwise pass=false with concrete requiredChanges. You may inspect the repository (read-only). Output JSON ONLY.",
+    "Set pass=true ONLY if ALL acceptance criteria are clearly met and the change is correct; otherwise pass=false with concrete requiredChanges. Judge from the diff and criteria below. Output JSON ONLY.",
     "",
     `PHASE: ${phase.title}`,
     `GOAL: ${phase.goal}`,
@@ -52,7 +52,6 @@ export async function review(phase: PlanPhase, diff: string, opts: ReviewerOptio
     const r = await runClaude({
       prompt: buildReviewPrompt(phase, diff) + reinforce,
       cwd: opts.cwd,
-      schema: VERDICT_SCHEMA,
       systemPrompt:
         "You are a structured-output engine. Respond with exactly one JSON object and nothing else — no prose, no markdown, no code fences. Begin with { and end with }.",
       model: opts.model,

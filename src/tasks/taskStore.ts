@@ -38,6 +38,8 @@ export class TaskStore {
   private readonly queue: QueueEntry[] = [];
   private readonly persistence: Persistence;
   private readonly bus = new EventEmitter();
+  private readonly settledPromises = new Map<string, Promise<void>>();
+  private readonly settledResolvers = new Map<string, () => void>();
 
   constructor(private readonly cfg: Config) {
     this.persistence = new Persistence(cfg.stateDir);
@@ -93,6 +95,11 @@ export class TaskStore {
   }
   list(): TaskRecord[] {
     return [...this.tasks.values()];
+  }
+
+  /** Resolves once a task is fully finalized (terminal state + diff computed). */
+  settled(taskId: string): Promise<void> {
+    return this.settledPromises.get(taskId) ?? Promise.resolve();
   }
   queuedCount(): number {
     return this.queue.length;
@@ -153,6 +160,10 @@ export class TaskStore {
       resumeOfSessionId: args.resumeSessionId,
     };
     this.tasks.set(rec.taskId, rec);
+    this.settledPromises.set(
+      rec.taskId,
+      new Promise<void>((resolve) => this.settledResolvers.set(rec.taskId, resolve)),
+    );
 
     if (this.runningCount() >= this.cfg.maxConcurrent) {
       this.touch(rec);
@@ -281,6 +292,7 @@ export class TaskStore {
     }
 
     this.touch(rec);
+    this.settledResolvers.get(rec.taskId)?.();
     this.dequeueNext();
   }
 

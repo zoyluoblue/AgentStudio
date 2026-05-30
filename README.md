@@ -51,6 +51,8 @@ node scripts/smoke.mjs  # 端到端冒烟（会真实跑一次 Codex）
 
 工具一览：`agent_start` · `agent_status` · `agent_result` · `agent_cancel` · `agent_list` · `agent_apply` · `agent_resume` · `agent_review` · `agent_executors` · `agent_stats`（详见 [`docs/CONFIG.md`](docs/CONFIG.md)）。
 
+📖 **完整使用教程**：[`docs/USAGE.md`](docs/USAGE.md)。
+
 ## 环境 / 技术栈
 
 - **Codex CLI** 0.130.0

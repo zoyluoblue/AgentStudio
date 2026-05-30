@@ -1,0 +1,19 @@
+appId: com.zoyluo.agentconnector
+productName: AgentConnector
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+# The engine is bundled into out/main by electron-vite, so the app is self-contained.
+asar: true
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+  # Skip electron-builder signing; `npm run dist` ad-hoc signs afterward (postdist),
+  # which is what Apple Silicon needs to launch a self-built app. On first open:
+  # right-click > Open. To SHARE without the warning, set a Developer ID identity
+  # here and add notarization.
+  identity: null

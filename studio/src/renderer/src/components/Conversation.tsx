@@ -1,20 +1,79 @@
 import { useEffect, useRef } from "react";
-import type { ChatMessage, Role } from "../../../shared/ipc";
-
-const META: Record<Role, { label: string; mono: string }> = {
-  user: { label: "你", mono: "你" },
-  claude: { label: "Claude", mono: "✦" },
-  codex: { label: "Codex", mono: "{ }" },
-  system: { label: "系统", mono: "·" },
-};
+import type { ChatMessage } from "../../../shared/ipc";
 
 function Thinking() {
   return (
-    <span className="thinking">
-      <i />
-      <i />
-      <i />
+    <span className="inline-flex gap-1 items-center h-5">
+      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 animate-bounce" style={{ animationDelay: "0ms" }} />
+      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 animate-bounce" style={{ animationDelay: "150ms" }} />
+      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40 animate-bounce" style={{ animationDelay: "300ms" }} />
     </span>
+  );
+}
+
+function ClaudeCard({ m }: { m: ChatMessage }) {
+  return (
+    <div className="bg-claude/5 border border-claude/20 rounded-xl p-stack_md mac-shadow">
+      <div className="flex items-center gap-stack_sm mb-stack_sm">
+        <div className="w-8 h-8 rounded-full bg-claude flex items-center justify-center text-white">
+          <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+            psychology
+          </span>
+        </div>
+        <div className="leading-tight">
+          <h3 className="font-headline text-body-lg font-bold text-claude">Claude</h3>
+          <p className="text-label-caps text-claude/60">#{m.n} · 规划 / 审查</p>
+        </div>
+      </div>
+      <div className="text-body-lg text-on-surface whitespace-pre-wrap">{m.text || (m.pending ? <Thinking /> : "")}</div>
+    </div>
+  );
+}
+
+function CodexCard({ m }: { m: ChatMessage }) {
+  return (
+    <div className="bg-surface rounded-xl border border-outline-variant/30 overflow-hidden mac-shadow">
+      <div className="flex items-center justify-between px-stack_md py-2 bg-surface-container">
+        <div className="flex items-center gap-stack_sm">
+          <div className="w-6 h-6 rounded bg-on-surface flex items-center justify-center text-surface">
+            <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+              code
+            </span>
+          </div>
+          <span className="text-body-sm font-code font-medium">Codex · #{m.n}</span>
+        </div>
+        {m.pending && (
+          <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">EXECUTING</span>
+        )}
+      </div>
+      <div className="p-4 bg-[#0d1117] text-[#c9d1d9] font-code text-[13px] leading-relaxed whitespace-pre-wrap break-words">
+        {m.text || (m.pending ? <span className="text-[#8b949e]">执行中…</span> : "")}
+      </div>
+    </div>
+  );
+}
+
+function UserBubble({ m }: { m: ChatMessage }) {
+  return (
+    <div className="flex justify-end">
+      <div className="max-w-[82%] bg-primary text-white rounded-xl rounded-tr-sm px-stack_md py-stack_sm text-body-lg whitespace-pre-wrap mac-shadow">
+        {m.text}
+      </div>
+    </div>
+  );
+}
+
+function SystemLine({ m }: { m: ChatMessage }) {
+  return (
+    <div className="flex justify-center">
+      <span
+        className={`text-body-sm px-3 py-1 rounded-full ${
+          m.kind === "error" ? "bg-error/10 text-error" : "bg-surface-container text-on-surface-variant"
+        }`}
+      >
+        {m.text}
+      </span>
+    </div>
   );
 }
 
@@ -31,54 +90,31 @@ export function Conversation({ messages, hasProject, emptyTitle, emptySub }: Pro
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  if (!hasProject) {
+  if (!hasProject || messages.length === 0) {
     return (
-      <div className="conversation empty-wrap">
-        <div className="empty">
-          <div className="empty-emoji">📂</div>
-          <div className="empty-title">先选一个项目文件夹</div>
-          <div className="empty-sub">点顶部「选择项目」。选好后即可开始。</div>
+      <div className="flex-1 min-h-0 flex items-center justify-center p-8">
+        <div className="text-center max-w-[340px]">
+          <span className="material-symbols-outlined text-[40px] text-primary/30 mb-3">{hasProject ? "auto_awesome" : "folder_open"}</span>
+          <p className="font-headline text-headline text-on-surface mb-1.5">{hasProject ? emptyTitle : "先选一个项目文件夹"}</p>
+          <p className="text-body-sm text-on-surface-variant leading-relaxed">{hasProject ? emptySub : "点顶部「选择项目」。选好后即可开始。"}</p>
         </div>
       </div>
     );
   }
-  if (messages.length === 0) {
-    return (
-      <div className="conversation empty-wrap">
-        <div className="empty">
-          <div className="empty-emoji">✨</div>
-          <div className="empty-title">{emptyTitle}</div>
-          <div className="empty-sub">{emptySub}</div>
-        </div>
-      </div>
-    );
-  }
+
   return (
-    <div className="conversation">
-      {messages.map((m) => {
-        if (m.role === "system") {
-          return (
-            <div key={m.id} className={`msg msg-system ${m.kind === "error" ? "is-error" : ""}`}>
-              <div className="msg-body">
-                <div className="msg-text">{m.text}</div>
-              </div>
-            </div>
-          );
-        }
-        const meta = META[m.role];
-        return (
-          <div key={m.id} className={`msg msg-${m.role}`}>
-            {m.role !== "user" && <div className={`avatar avatar-${m.role}`}>{meta.mono}</div>}
-            <div className="msg-body">
-              <div className="msg-meta">
-                <span className="msg-name">{meta.label}</span>
-                <span className="msg-n">#{m.n}</span>
-              </div>
-              <div className="msg-text">{m.text || (m.pending ? <Thinking /> : "")}</div>
-            </div>
-          </div>
-        );
-      })}
+    <div className="flex-1 min-h-0 overflow-y-auto p-gutter flex flex-col gap-gutter">
+      {messages.map((m) =>
+        m.role === "user" ? (
+          <UserBubble key={m.id} m={m} />
+        ) : m.role === "system" ? (
+          <SystemLine key={m.id} m={m} />
+        ) : m.role === "claude" ? (
+          <ClaudeCard key={m.id} m={m} />
+        ) : (
+          <CodexCard key={m.id} m={m} />
+        ),
+      )}
       <div ref={endRef} />
     </div>
   );

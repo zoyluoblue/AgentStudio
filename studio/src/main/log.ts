@@ -2,6 +2,12 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 let logFile = "";
+let sink: ((line: string) => void) | null = null;
+
+/** Also forward every log line somewhere live (e.g. the renderer's terminal panel). */
+export function setLogSink(fn: (line: string) => void): void {
+  sink = fn;
+}
 
 export function setLogFile(p: string): void {
   logFile = p;
@@ -34,6 +40,13 @@ export function log(event: string, data?: unknown): void {
   if (logFile) {
     try {
       appendFileSync(logFile, `${line}\n`);
+    } catch {
+      /* ignore */
+    }
+  }
+  if (sink) {
+    try {
+      sink(line);
     } catch {
       /* ignore */
     }

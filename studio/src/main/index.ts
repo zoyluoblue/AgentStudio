@@ -19,7 +19,7 @@ import { askClaude } from "./claudeDriver.js";
 import { askCodex } from "./codexDriver.js";
 import { changesSince, snapshot } from "./diff.js";
 import { fixPath } from "./fixPath.js";
-import { log, setLogFile } from "./log.js";
+import { log, setLogFile, setLogSink } from "./log.js";
 
 // GUI apps don't inherit the shell PATH — repair it so claude/codex/git resolve.
 fixPath();
@@ -334,6 +334,7 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   setLogFile(join(app.getPath("userData"), "logs", "agentconnector.log"));
+  setLogSink((line) => send(CH.logLine, line));
   log("app.ready", { mode, userData: app.getPath("userData") });
 
   ipcMain.handle(CH.send, (_e, p: { text: string; target: AgentKind }) => handleSend(p.text, p.target));

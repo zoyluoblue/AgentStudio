@@ -27,6 +27,11 @@ const api: StudioApi = {
     ipcRenderer.on(CH.previewRefresh, h);
     return () => ipcRenderer.off(CH.previewRefresh, h);
   },
+  onLog: (cb) => {
+    const h = (_e: IpcRendererEvent, line: string) => cb(line);
+    ipcRenderer.on(CH.logLine, h);
+    return () => ipcRenderer.off(CH.logLine, h);
+  },
   onEvent: (cb) => {
     const h = (_e: IpcRendererEvent, m: ChatMessage) => cb(m);
     ipcRenderer.on(CH.event, h);

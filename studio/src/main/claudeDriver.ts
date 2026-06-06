@@ -14,6 +14,8 @@ export interface ClaudeAsk {
   /** disable ALL tools so Claude answers directly in one turn (no agentic wandering) */
   disableTools?: boolean;
   signal?: AbortSignal;
+  /** live status updates (e.g. "重连中") during retries */
+  onStatus?: (s: string) => void;
 }
 
 export interface ClaudeResult {
@@ -61,7 +63,7 @@ function fakeClaude(ask: ClaudeAsk): Promise<ClaudeResult> {
         "下面交给 Codex 按这个计划实现。",
       ].join("\n");
   return new Promise((resolve) => {
-    const t = setTimeout(() => resolve({ ok: true, text, sessionId: "fake" }), 900);
+    const t = setTimeout(() => resolve({ ok: true, text, sessionId: "fake" }), Number(process.env.STUDIO_FAKE_DELAY ?? 900));
     ask.signal?.addEventListener("abort", () => {
       clearTimeout(t);
       resolve({ ok: false, text: "", error: "已停止" });
@@ -150,6 +152,7 @@ export async function askClaude(ask: ClaudeAsk): Promise<ClaudeResult> {
     last = await askClaudeOnce(ask);
     if (last.ok || !last.error || last.error === "已停止" || !TRANSIENT.test(last.error)) return last;
     console.error(`[claude] transient error (try ${attempt + 1}/3): ${last.error.slice(0, 120)} — retrying`);
+    ask.onStatus?.(`重连中（第 ${attempt + 1} 次重试）`);
     await delay(700 * (attempt + 1), ask.signal);
   }
   return { ...last, error: `${last.error ?? "网络错误"}（已重试 3 次仍失败，请稍后再试）` };

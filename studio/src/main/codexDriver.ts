@@ -42,7 +42,7 @@ function fakeCodex(ask: CodexAsk): Promise<CodexResult> {
   return new Promise((resolve) => {
     const t = setTimeout(
       () => resolve({ ok: true, text: "已按计划创建 index.html / styles.css / app.js，实现了添加、勾选完成与本地保存。", threadId: "fake", steps: 3 }),
-      1000,
+      Number(process.env.STUDIO_FAKE_DELAY ?? 1000),
     );
     ask.signal?.addEventListener("abort", () => {
       clearTimeout(t);

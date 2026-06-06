@@ -1,5 +1,6 @@
 import { type IpcRendererEvent, contextBridge, ipcRenderer } from "electron";
 import {
+  type ActivityState,
   type AgentKind,
   type AuthState,
   type BusyState,
@@ -41,6 +42,11 @@ const api: StudioApi = {
     const h = (_e: IpcRendererEvent, b: BusyState) => cb(b);
     ipcRenderer.on(CH.busy, h);
     return () => ipcRenderer.off(CH.busy, h);
+  },
+  onActivity: (cb) => {
+    const h = (_e: IpcRendererEvent, a: ActivityState) => cb(a);
+    ipcRenderer.on(CH.activity, h);
+    return () => ipcRenderer.off(CH.activity, h);
   },
   getProject: () => ipcRenderer.invoke(CH.projectGet),
   pickProject: () => ipcRenderer.invoke(CH.projectPick),

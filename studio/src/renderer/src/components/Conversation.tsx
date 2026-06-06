@@ -12,23 +12,29 @@ function Thinking() {
   );
 }
 
+function NLabel({ n, side }: { n: number; side: "start" | "end" }) {
+  return <span className={`text-[11px] font-bold text-on-surface-variant/45 ${side === "end" ? "pr-1" : "pl-1"}`}>#{n}</span>;
+}
+
 function ClaudeCard({ m }: { m: ChatMessage }) {
   const { t } = useLang();
   return (
-    <div className="bg-claude/5 border border-claude/20 rounded-xl p-stack_md mac-shadow">
-      <div className="flex items-center gap-stack_sm mb-stack_sm">
-        <span className="text-label-caps font-bold text-claude/50">#{m.n}</span>
-        <div className="w-8 h-8 rounded-full bg-claude flex items-center justify-center text-white">
-          <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-            psychology
-          </span>
+    <div className="flex flex-col items-start gap-1">
+      <NLabel n={m.n} side="start" />
+      <div className="w-full bg-claude/5 border border-claude/20 rounded-xl p-stack_md mac-shadow">
+        <div className="flex items-center gap-stack_sm mb-stack_sm">
+          <div className="w-8 h-8 rounded-full bg-claude flex items-center justify-center text-white">
+            <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+              psychology
+            </span>
+          </div>
+          <div className="leading-tight">
+            <h3 className="font-headline text-body-lg font-bold text-claude">Claude</h3>
+            <p className="text-label-caps text-claude/60">{t("planReview")}</p>
+          </div>
         </div>
-        <div className="leading-tight">
-          <h3 className="font-headline text-body-lg font-bold text-claude">Claude</h3>
-          <p className="text-label-caps text-claude/60">{t("planReview")}</p>
-        </div>
+        <div className="text-body-lg text-on-surface whitespace-pre-wrap">{m.text || (m.pending ? <Thinking /> : "")}</div>
       </div>
-      <div className="text-body-lg text-on-surface whitespace-pre-wrap">{m.text || (m.pending ? <Thinking /> : "")}</div>
     </div>
   );
 }
@@ -36,21 +42,23 @@ function ClaudeCard({ m }: { m: ChatMessage }) {
 function CodexCard({ m }: { m: ChatMessage }) {
   const { t } = useLang();
   return (
-    <div className="bg-surface rounded-xl border border-outline-variant/30 overflow-hidden mac-shadow">
-      <div className="flex items-center justify-between px-stack_md py-2 bg-surface-container">
-        <div className="flex items-center gap-stack_sm">
-          <span className="text-[11px] font-bold text-on-surface-variant/60">#{m.n}</span>
-          <div className="w-6 h-6 rounded bg-on-surface flex items-center justify-center text-surface">
-            <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-              code
-            </span>
+    <div className="flex flex-col items-start gap-1">
+      <NLabel n={m.n} side="start" />
+      <div className="w-full bg-surface rounded-xl border border-outline-variant/30 overflow-hidden mac-shadow">
+        <div className="flex items-center justify-between px-stack_md py-2 bg-surface-container">
+          <div className="flex items-center gap-stack_sm">
+            <div className="w-6 h-6 rounded bg-on-surface flex items-center justify-center text-surface">
+              <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                code
+              </span>
+            </div>
+            <span className="text-body-sm font-code font-medium">Codex</span>
           </div>
-          <span className="text-body-sm font-code font-medium">Codex</span>
+          {m.pending && <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">EXECUTING</span>}
         </div>
-        {m.pending && <span className="text-[10px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">EXECUTING</span>}
-      </div>
-      <div className="p-4 bg-[#0d1117] text-[#c9d1d9] font-code text-[13px] leading-relaxed whitespace-pre-wrap break-words">
-        {m.text || (m.pending ? <span className="text-[#8b949e]">{t("executing")}</span> : "")}
+        <div className="p-4 bg-[#0d1117] text-[#c9d1d9] font-code text-[13px] leading-relaxed whitespace-pre-wrap break-words">
+          {m.text || (m.pending ? <span className="text-[#8b949e]">{t("executing")}</span> : "")}
+        </div>
       </div>
     </div>
   );
@@ -59,7 +67,7 @@ function CodexCard({ m }: { m: ChatMessage }) {
 function UserBubble({ m }: { m: ChatMessage }) {
   return (
     <div className="flex flex-col items-end gap-1">
-      <span className="text-[11px] font-bold text-on-surface-variant/45 pr-1">#{m.n}</span>
+      <NLabel n={m.n} side="end" />
       <div className="max-w-[82%] bg-primary text-white rounded-xl rounded-tr-sm px-stack_md py-stack_sm text-body-lg whitespace-pre-wrap mac-shadow">
         {m.text}
       </div>

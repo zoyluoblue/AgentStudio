@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLang } from "./i18n";
-import type { AgentKind, AuthState, BusyState, ChatMessage, Mode, ProjectInfo } from "../../shared/ipc";
+import type { ActivityState, AgentKind, AuthState, BusyState, ChatMessage, Mode, ProjectInfo } from "../../shared/ipc";
 import { AgentPanel } from "./components/AgentPanel";
 import { Sidebar } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
 
 const DISCONNECTED: AuthState = { claude: { connected: false }, codex: { connected: false } };
+const NO_ACTIVITY: ActivityState = { claude: "", codex: "" };
 
 const CLAUDE_MODELS = [
   { v: "", label: "默认" },
@@ -29,6 +30,7 @@ export function App() {
   const { t } = useLang();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState<BusyState>({ claude: false, codex: false });
+  const [activity, setActivity] = useState<ActivityState>(NO_ACTIVITY);
   const [project, setProject] = useState<ProjectInfo>({ cwd: null, name: null });
   const [auth, setAuth] = useState<AuthState>(DISCONNECTED);
   const [mode, setMode] = useState<Mode>("solo");
@@ -46,6 +48,7 @@ export function App() {
       });
     });
     const offBusy = window.studio.onBusy(setBusy);
+    const offActivity = window.studio.onActivity(setActivity);
     const offProject = window.studio.onProject((p) => {
       setProject(p);
       setMessages([]);
@@ -58,6 +61,7 @@ export function App() {
     return () => {
       offEvent();
       offBusy();
+      offActivity();
       offProject();
       offAuth();
       offMode();
@@ -94,13 +98,13 @@ export function App() {
     role: t(kind === "claude" ? "planReview" : "codeExec"),
     status: auth[kind],
     connecting: connecting[kind],
+    activity: activity[kind],
     onConnect: () => void connect(kind),
     models: kind === "claude" ? CLAUDE_MODELS : CODEX_MODELS,
     model: models[kind],
     onModel: (v: string) => changeModel(kind, v),
   });
 
-  // Claude composer (chat in solo / orchestration goal in collab)
   const claudeDisabled = !project.cwd || !auth.claude.connected || (collab && !auth.codex.connected);
   const claudeComposer = {
     busy: collab ? anyBusy : busy.claude,
@@ -118,7 +122,6 @@ export function App() {
     onStop: () => window.studio.abort("claude"),
   };
 
-  // Codex composer — solo only (collab auto-drives Codex)
   const codexComposer = collab
     ? undefined
     : {

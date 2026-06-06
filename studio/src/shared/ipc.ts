@@ -40,11 +40,18 @@ export interface BusyState {
   codex: boolean;
 }
 
+/** Live phase text per agent ("" = idle): e.g. 规划中 / 执行中 / 审查中 / 思考中 / 重连中 */
+export interface ActivityState {
+  claude: string;
+  codex: string;
+}
+
 export const CH = {
   send: "chat:send",
   abort: "chat:abort",
   event: "chat:event",
   busy: "chat:busy",
+  activity: "chat:activity",
   projectGet: "project:get",
   projectPick: "project:pick",
   projectEvent: "project:event",
@@ -77,6 +84,7 @@ export interface StudioApi {
   /** A new or updated message (upsert by id). */
   onEvent(cb: (m: ChatMessage) => void): () => void;
   onBusy(cb: (b: BusyState) => void): () => void;
+  onActivity(cb: (a: ActivityState) => void): () => void;
   getProject(): Promise<ProjectInfo>;
   pickProject(): Promise<ProjectInfo>;
   onProject(cb: (p: ProjectInfo) => void): () => void;

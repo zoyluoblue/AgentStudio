@@ -11,13 +11,14 @@ interface Props {
   role: string;
   status: AuthStatus;
   connecting: boolean;
+  activity: string;
   onConnect: () => void;
   models: ModelOpt[];
   model: string;
   onModel: (v: string) => void;
 }
 
-export function AgentPanelHeader({ kind, name, role, status, connecting, onConnect, models, model, onModel }: Props) {
+export function AgentPanelHeader({ kind, name, role, status, connecting, activity, onConnect, models, model, onModel }: Props) {
   const { t } = useLang();
   const accent = kind === "claude" ? "#5856D6" : "#0050cb";
   return (
@@ -34,7 +35,15 @@ export function AgentPanelHeader({ kind, name, role, status, connecting, onConne
         <div className="text-label-caps text-on-surface-variant">{role}</div>
       </div>
       <div className="ml-auto flex items-center gap-2">
-        {status.connected ? (
+        {activity ? (
+          <span
+            className="flex items-center gap-1.5 text-body-sm font-medium px-2.5 py-1 rounded-full"
+            style={{ color: accent, background: `${accent}14` }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: accent }} />
+            {activity}
+          </span>
+        ) : status.connected ? (
           <span className="flex items-center gap-1.5 text-body-sm text-on-surface-variant bg-surface-container px-2.5 py-1 rounded-full max-w-[160px]">
             <span className="w-1.5 h-1.5 rounded-full bg-[#27C93F] shrink-0" />
             <span className="truncate">{status.detail ?? t("connected")}</span>

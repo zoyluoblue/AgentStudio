@@ -79,9 +79,13 @@ function send(channel: string, payload: unknown): void {
 function authCwd(): string {
   return projectCwd ?? homedir();
 }
-function setBusy(kind: AgentKind, v: boolean): void {
-  busy[kind] = v;
+const activity: Record<AgentKind, string> = { claude: "", codex: "" };
+/** Set an agent's live phase text ("" = idle). Drives both busy + the status pill. */
+function setActivity(kind: AgentKind, text: string): void {
+  activity[kind] = text;
+  busy[kind] = text !== "";
   send(CH.busy, { ...busy });
+  send(CH.activity, { ...activity });
 }
 
 // ---- messages (with a stable sequence number per id for referencing turns) ----
@@ -125,11 +129,11 @@ function setProject(p: string): void {
 }
 
 // ---- single agent turns (post to a lane + return the result) ----
-async function claudeTurn(prompt: string, system: string) {
+async function claudeTurn(prompt: string, system: string, phase = "思考中") {
   const pid = post("claude", "text", "", true, undefined, "claude");
-  setBusy("claude", true);
+  setActivity("claude", phase);
   aborts.claude = new AbortController();
-  log("claude.turn.start", { model: agentModel.claude || "default", promptLen: prompt.length, cwd: projectCwd });
+  log("claude.turn.start", { phase, model: agentModel.claude || "default", promptLen: prompt.length, cwd: projectCwd });
   const res = await askClaude({
     prompt,
     cwd: projectCwd as string,
@@ -138,17 +142,18 @@ async function claudeTurn(prompt: string, system: string) {
     disableTools: true,
     model: agentModel.claude || undefined,
     signal: aborts.claude.signal,
+    onStatus: (s) => setActivity("claude", s),
   });
   log("claude.turn.done", { ok: res.ok, len: res.text.length, err: res.error });
   if (res.sessionId) claudeSession = res.sessionId;
   post(res.ok ? "claude" : "system", res.ok ? "text" : "error", res.ok ? res.text : (res.error ?? "出错了"), false, pid, "claude");
-  setBusy("claude", false);
+  setActivity("claude", "");
   aborts.claude = null;
   return res;
 }
-async function codexTurn(prompt: string) {
+async function codexTurn(prompt: string, phase = "执行中") {
   const pid = post("codex", "progress", "Codex 正在处理…", true, undefined, "codex");
-  setBusy("codex", true);
+  setActivity("codex", phase);
   aborts.codex = new AbortController();
   log("codex.turn.start", { model: agentModel.codex || "default", promptLen: prompt.length, cwd: projectCwd });
   const res = await askCodex({
@@ -164,7 +169,7 @@ async function codexTurn(prompt: string) {
   if (res.threadId) codexThread = res.threadId;
   const suffix = res.ok && res.steps ? `\n\n（执行了 ${res.steps} 步操作）` : "";
   post(res.ok ? "codex" : "system", res.ok ? "text" : "error", res.ok ? res.text + suffix : (res.error ?? "出错了"), false, pid, "codex");
-  setBusy("codex", false);
+  setActivity("codex", "");
   aborts.codex = null;
   send(CH.previewRefresh, previewUrl()); // codex may have changed files -> refresh the live preview
   return res;
@@ -184,19 +189,19 @@ async function runOrchestration(goal: string): Promise<void> {
   log("orchestration.start", { goal: goal.slice(0, 120) });
   post("user", "text", goal, false, undefined, "claude");
 
-  const plan = await claudeTurn(withIntervene(planPrompt(goal), "claude"), PLANNER_SYSTEM);
+  const plan = await claudeTurn(withIntervene(planPrompt(goal), "claude"), PLANNER_SYSTEM, "规划中");
   if (orchStopped()) return;
   if (!plan.ok) return;
 
   const before = snapshot(projectCwd as string);
-  const exec = await codexTurn(withIntervene(executePrompt(plan.text), "codex"));
+  const exec = await codexTurn(withIntervene(executePrompt(plan.text), "codex"), "执行中");
   if (orchStopped()) return;
   if (!exec.ok) return;
 
   for (let iter = 0; iter < MAX_REVISE; iter++) {
     const diff = changesSince(before, projectCwd as string);
     log("orchestration.review", { iter, diffLen: diff.length });
-    const review = await claudeTurn(withIntervene(reviewPrompt(goal, diff), "claude"), REVIEWER_SYSTEM);
+    const review = await claudeTurn(withIntervene(reviewPrompt(goal, diff), "claude"), REVIEWER_SYSTEM, "审查中");
     if (orchStopped()) return;
     if (!review.ok) return;
     if (verdictPass(review.text)) {
@@ -209,7 +214,7 @@ async function runOrchestration(goal: string): Promise<void> {
       log("orchestration.exhausted");
       return;
     }
-    const revise = await codexTurn(withIntervene(revisePrompt(review.text), "codex"));
+    const revise = await codexTurn(withIntervene(revisePrompt(review.text), "codex"), "修订中");
     if (orchStopped()) return;
     if (!revise.ok) return;
   }
@@ -317,10 +322,14 @@ function createWindow(): void {
         /* ignore */
       }
       setProject(demoDir);
+      // When STUDIO_SHOT_DELAY is set, capture on a fixed timer (can land mid-orchestration);
+      // otherwise capture once the turn(s) settle.
+      const fixedDelay = process.env.STUDIO_SHOT_DELAY;
+      if (shotPath && fixedDelay) setTimeout(() => capture(shotPath), Number(fixedDelay));
       void handleSend(demo, "claude").then(async () => {
         const cd = process.env.STUDIO_DEMO_CODEX;
         if (cd && mode === "solo") await handleSend(cd, "codex");
-        if (shotPath) setTimeout(() => capture(shotPath), 3500);
+        if (shotPath && !fixedDelay) setTimeout(() => capture(shotPath), 3500);
       });
     } else if (shotPath) {
       setTimeout(() => capture(shotPath), Number(process.env.STUDIO_SHOT_DELAY ?? 8000));

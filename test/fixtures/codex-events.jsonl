@@ -1,6 +1,0 @@
-{"type":"thread.started","thread_id":"019e76c4-8bba-7bb1-8042-485d43cba626"}
-{"type":"turn.started"}
-{"type":"item.started","item":{"id":"item_0","type":"command_execution","command":"/bin/zsh -lc ls","aggregated_output":"","exit_code":null,"status":"in_progress"}}
-{"type":"item.completed","item":{"id":"item_0","type":"command_execution","command":"/bin/zsh -lc ls","aggregated_output":"README.md\npackage.json\ntsconfig.json\nvitest.config.ts\n","exit_code":0,"status":"completed"}}
-{"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"done"}}
-{"type":"turn.completed","usage":{"input_tokens":81033,"cached_input_tokens":46848,"output_tokens":63,"reasoning_output_tokens":0}}

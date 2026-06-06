@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import type { AgentKind, AuthState, BusyState, ChatMessage, Mode, ProjectInfo } from "../../shared/ipc";
+import { AgentPanelHeader } from "./components/AgentPanelHeader";
 import { Composer } from "./components/Composer";
 import { Conversation } from "./components/Conversation";
 import { LivePreview } from "./components/LivePreview";
 import { Sidebar } from "./components/Sidebar";
-import { StatusBar } from "./components/StatusBar";
-import { Terminal } from "./components/Terminal";
 import { TopBar } from "./components/TopBar";
 
 const DISCONNECTED: AuthState = { claude: { connected: false }, codex: { connected: false } };
@@ -89,6 +88,18 @@ export function App() {
   };
   const pick = () => void window.studio.pickProject();
 
+  const headerProps = (kind: AgentKind) => ({
+    kind,
+    name: kind === "claude" ? "Claude" : "Codex",
+    role: kind === "claude" ? "规划 · 审查" : "写码 · 执行",
+    status: auth[kind],
+    connecting: connecting[kind],
+    onConnect: () => void connect(kind),
+    models: kind === "claude" ? CLAUDE_MODELS : CODEX_MODELS,
+    model: models[kind],
+    onModel: (v: string) => changeModel(kind, v),
+  });
+
   const target: AgentKind = collab ? "claude" : soloTarget;
   const disabled =
     !project.cwd || (collab ? !auth.claude.connected || !auth.codex.connected : !auth[soloTarget].connected);
@@ -104,18 +115,6 @@ export function App() {
         : soloTarget === "claude"
           ? "和 Claude 聊聊你想做什么…（Enter 发送）"
           : "让 Codex 帮你写代码、改文件…（Enter 发送）";
-
-  const agentCtl = (kind: AgentKind) => ({
-    kind,
-    name: kind === "claude" ? "Claude" : "Codex",
-    accent: kind === "claude" ? "#5856D6" : "#0050cb",
-    status: auth[kind],
-    connecting: connecting[kind],
-    onConnect: () => void connect(kind),
-    models: kind === "claude" ? CLAUDE_MODELS : CODEX_MODELS,
-    model: models[kind],
-    onModel: (v: string) => changeModel(kind, v),
-  });
 
   const soloToggle = collab ? null : (
     <div className="flex items-center gap-1.5 mb-2">
@@ -139,10 +138,10 @@ export function App() {
     <div className="h-screen flex bg-background text-on-surface overflow-hidden">
       <Sidebar onNewProject={pick} />
       <main className="flex-1 min-w-0 flex flex-col">
-        <TopBar project={project} mode={mode} onMode={changeMode} onPick={pick} onExecute={() => {}} />
-        <StatusBar mode={mode} busy={anyBusy} claude={agentCtl("claude")} codex={agentCtl("codex")} />
+        <TopBar project={project} mode={mode} onMode={changeMode} onPick={pick} />
         <div className="flex-1 min-h-0 flex p-gutter gap-gutter bg-surface-container-lowest">
           <section className="w-1/2 min-w-0 flex flex-col bg-surface rounded-xl border border-outline-variant/30 overflow-hidden mac-shadow">
+            <AgentPanelHeader {...headerProps("claude")} />
             <Conversation
               messages={messages}
               hasProject={!!project.cwd}
@@ -150,7 +149,7 @@ export function App() {
               emptySub={
                 collab
                   ? "回车后 Claude 规划 → Codex 自动执行 → Claude 审查，全程自动。"
-                  : "Claude 负责规划/审查，Codex 负责写码。切到「双向」可让两者自动协作完成。"
+                  : "Claude 负责规划/审查，Codex 负责写码。切到「双向」可让两者自动协作。"
               }
             />
             <Composer
@@ -162,9 +161,9 @@ export function App() {
               extra={soloToggle}
             />
           </section>
-          <section className="w-1/2 min-w-0 flex flex-col gap-gutter">
+          <section className="w-1/2 min-w-0 flex flex-col bg-surface rounded-xl border border-outline-variant/30 overflow-hidden mac-shadow">
+            <AgentPanelHeader {...headerProps("codex")} />
             <LivePreview />
-            <Terminal />
           </section>
         </div>
       </main>

@@ -5,18 +5,12 @@ interface Props {
   mode: Mode;
   onMode: (m: Mode) => void;
   onPick: () => void;
-  onExecute: () => void;
 }
 
-export function TopBar({ project, mode, onMode, onPick, onExecute }: Props) {
+export function TopBar({ project, mode, onMode, onPick }: Props) {
   return (
     <header className="h-16 shrink-0 bg-surface/80 backdrop-blur-md border-b border-outline-variant/20 shadow-sm flex justify-between items-center px-margin_page">
       <div className="flex items-center gap-stack_lg">
-        <div className="flex gap-1.5">
-          <div className="w-3 h-3 rounded-full bg-error/80" />
-          <div className="w-3 h-3 rounded-full bg-[#FFBD2E]" />
-          <div className="w-3 h-3 rounded-full bg-[#27C93F]" />
-        </div>
         <button type="button" onClick={onPick} className="relative w-64 text-left group">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] group-hover:text-primary transition-colors">
             folder
@@ -50,24 +44,9 @@ export function TopBar({ project, mode, onMode, onPick, onExecute }: Props) {
           </button>
         </nav>
       </div>
-      <div className="flex items-center gap-stack_md">
-        <button
-          type="button"
-          onClick={onExecute}
-          className="bg-primary text-white px-4 py-1.5 rounded-lg text-body-lg font-semibold hover:opacity-80 active:scale-95 transition-all"
-        >
-          Execute
-        </button>
-        <button type="button" className="text-on-surface-variant font-medium hover:text-primary transition-colors text-body-sm">
-          CN/EN
-        </button>
-        <button type="button" className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-surface-variant/50 transition-colors">
-          <span className="material-symbols-outlined text-on-surface-variant">notifications</span>
-        </button>
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white text-body-sm font-bold">
-          Z
-        </div>
-      </div>
+      <button type="button" className="text-on-surface-variant font-medium hover:text-primary transition-colors text-body-sm">
+        中文/EN
+      </button>
     </header>
   );
 }

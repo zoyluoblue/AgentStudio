@@ -21,7 +21,7 @@ export function LivePreview() {
   }, []);
 
   return (
-    <div className="flex-1 min-h-0 bg-white rounded-xl border border-outline-variant/30 flex flex-col overflow-hidden mac-shadow">
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <div className="h-10 shrink-0 border-b border-outline-variant/20 flex items-center justify-between px-4 bg-surface-container-low">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-[16px] text-on-surface-variant">language</span>

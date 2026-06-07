@@ -1,5 +1,5 @@
-appId: com.zoyluo.agentconnector
-productName: AgentConnector
+appId: com.zoyluo.agentstudio
+productName: AgentStudio
 directories:
   output: release
   buildResources: build

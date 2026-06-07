@@ -1,11 +1,11 @@
 {
   "mcpServers": {
-    "agentconnector": {
+    "agentstudio": {
       "command": "node",
       "args": ["dist/index.js"],
       "env": {
-        "AGENTCONNECTOR_DEFAULT_EXECUTOR": "codex",
-        "AGENTCONNECTOR_DEFAULT_SANDBOX": "workspace-write"
+        "AGENTSTUDIO_DEFAULT_EXECUTOR": "codex",
+        "AGENTSTUDIO_DEFAULT_SANDBOX": "workspace-write"
       }
     }
   }

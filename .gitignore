@@ -9,5 +9,5 @@ dist/
 .idea/
 .DS_Store
 
-# AgentConnector runtime state (Phase 2)
-.agentconnector/
+# AgentStudio runtime state (Phase 2)
+.agentstudio/

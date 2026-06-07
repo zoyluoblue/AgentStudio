@@ -1,7 +1,7 @@
 {
-  "name": "agent-connector",
+  "name": "agent-studio",
   "version": "0.0.1",
-  "description": "AgentConnector — friendly Mac desktop app to chat with Claude (plan/review) and Codex (code), in single or orchestrated mode.",
+  "description": "AgentStudio — friendly Mac desktop app to chat with Claude (plan/review) and Codex (code), in single or orchestrated mode.",
   "author": "ZoyLuo",
   "private": true,
   "main": "out/main/index.js",

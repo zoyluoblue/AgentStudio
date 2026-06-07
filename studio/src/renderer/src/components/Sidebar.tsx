@@ -22,7 +22,7 @@ export function Sidebar({ onNewProject, view, onView }: Props) {
           <span className="material-symbols-outlined text-white text-[20px]">hub</span>
         </div>
         <div>
-          <h1 className="font-headline text-headline font-bold text-primary leading-tight">AgentConnector</h1>
+          <h1 className="font-headline text-headline font-bold text-primary leading-tight">AgentStudio</h1>
           <p className="font-label-caps text-label-caps text-on-surface-variant">Professional Suite</p>
         </div>
       </div>

@@ -1,6 +1,6 @@
 ---
 name: agent-director
-description: Drive the AgentConnector plan→dispatch→review loop. Use when the user wants to delegate implementation work to an executor backend (Codex by default) while you act as the director — decomposing the work, dispatching coding tasks via the agent_* MCP tools, reviewing the diffs, and deciding the next step. Triggers include "use the director", "delegate this to Codex", "run the agent loop", "have the executor implement…", or any multi-step build where you should orchestrate an executor rather than hand-edit the code yourself.
+description: Drive the AgentStudio plan→dispatch→review loop. Use when the user wants to delegate implementation work to an executor backend (Codex by default) while you act as the director — decomposing the work, dispatching coding tasks via the agent_* MCP tools, reviewing the diffs, and deciding the next step. Triggers include "use the director", "delegate this to Codex", "run the agent loop", "have the executor implement…", or any multi-step build where you should orchestrate an executor rather than hand-edit the code yourself.
 ---
 
 # Agent Director
@@ -10,7 +10,7 @@ decision of what to do next. An **executor** backend (default: `codex`) is the
 *implementer*. Progress flows automatically through the `agent_*` MCP tools — never
 ask the human to copy-paste work between you and the executor.
 
-## Tools (from the `agentconnector` MCP server)
+## Tools (from the `agentstudio` MCP server)
 
 - `agent_start({ prompt, executor?, cwd?, sandbox?, isolation?, model?, outputSchema?, retries?, label? })` → `{ taskId }`.
   Dispatches a task and returns **immediately** (async; queued if at the concurrency cap).

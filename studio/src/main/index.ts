@@ -54,7 +54,7 @@ function withIntervene(prompt: string, lane: AgentKind): string {
 }
 
 const PLANNER_SYSTEM =
-  "你是 AgentConnector 的规划助手，面向不懂编程的用户。用简洁、友好的中文交流，避免专业黑话。" +
+  "你是 AgentStudio 的规划助手，面向不懂编程的用户。用简洁、友好的中文交流，避免专业黑话。" +
   "把用户想做的东西拆成简短的分步实现计划（3 步以内），供右栏的执行方实现。只输出计划本身，不要写代码。";
 const REVIEWER_SYSTEM =
   "你是严谨的代码审查员。基于用户目标和执行方刚做的改动（含文件内容），判断是否达成目标且没有明显问题。用简洁中文。";
@@ -384,7 +384,7 @@ function createWindow(): void {
     height: Number(process.env.STUDIO_WIN_HEIGHT) || 920,
     minWidth: 1040,
     minHeight: 640,
-    title: "AgentConnector",
+    title: "AgentStudio",
     backgroundColor: "#0e0f13",
     webPreferences: { preload: join(__dirname, "../preload/index.js"), contextIsolation: true, sandbox: false, webviewTag: true },
   });
@@ -403,7 +403,7 @@ function createWindow(): void {
   const demo = process.env.STUDIO_DEMO;
   win.webContents.on("did-finish-load", () => {
     if (demo) {
-      const demoDir = process.env.STUDIO_DEMO_DIR || join(tmpdir(), "agentconnector-demo");
+      const demoDir = process.env.STUDIO_DEMO_DIR || join(tmpdir(), "agentstudio-demo");
       try {
         mkdirSync(demoDir, { recursive: true });
       } catch {
@@ -430,7 +430,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  setLogFile(join(app.getPath("userData"), "logs", "agentconnector.log"));
+  setLogFile(join(app.getPath("userData"), "logs", "agentstudio.log"));
   setLogSink((line) => send(CH.logLine, line));
   store.initStore(join(app.getPath("userData"), "history"));
   initSettings(join(app.getPath("userData"), "settings.json"));

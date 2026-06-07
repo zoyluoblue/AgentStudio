@@ -20,8 +20,8 @@ import {
 import { agentLogin, agentStatus } from "./auth.js";
 import { askClaude } from "./claudeDriver.js";
 import { askCodex } from "./codexDriver.js";
-import { askDeepseek } from "./deepseekDriver.js";
-import { changesSince, snapshot } from "./diff.js";
+import { DEEPSEEK_EXECUTOR_SYSTEM, applyFiles, askDeepseek, parseFileBlocks } from "./deepseekDriver.js";
+import { changesSince, projectContext, snapshot } from "./diff.js";
 import { fixPath } from "./fixPath.js";
 import { log, setLogFile, setLogSink } from "./log.js";
 import { backendFor, deepseekKey, getSettings, initSettings, updateSettings } from "./settings.js";
@@ -188,6 +188,24 @@ async function laneTurn(kind: AgentKind, prompt: string, system: string, phase: 
     if (r.threadId) codexThreads[kind] = r.threadId;
     const suffix = r.ok && r.steps ? `\n\n（执行了 ${r.steps} 步操作）` : "";
     res = { ok: r.ok, text: r.ok ? r.text + suffix : r.text, error: r.error };
+  } else if (write) {
+    // DeepSeek executor (Option B): it has no agentic harness, so it emits whole files
+    // (with the current files as context) and WE write them; the master then reviews the diff.
+    const ctx = projectContext(projectCwd as string);
+    const full = `${prompt}\n\n当前项目文件（在此基础上新建/修改；为空则从零创建）：\n${ctx || "（空项目）"}`;
+    const r = await askDeepseek({ prompt: full, systemPrompt: DEEPSEEK_EXECUTOR_SYSTEM, model, apiKey: deepseekKey(), signal });
+    if (!r.ok) {
+      res = { ok: false, text: "", error: r.error };
+    } else {
+      setActivity(kind, "写入文件中");
+      const { files, prose } = parseFileBlocks(r.text);
+      const written = applyFiles(projectCwd as string, files);
+      log("deepseek.exec.applied", { files: written.length });
+      const summary = written.length
+        ? `\n\n📄 已写入 ${written.length} 个文件：${written.join("、")}`
+        : "\n\n（未解析到文件块——请让 DeepSeek 按 <<<FILE>>> 格式输出）";
+      res = { ok: true, text: (prose || "（已处理）") + summary };
+    }
   } else {
     const r = await askDeepseek({ prompt, systemPrompt: system, model, apiKey: deepseekKey(), signal });
     res = { ok: r.ok, text: r.text, error: r.error };
@@ -330,6 +348,26 @@ async function connectAgent(kind: AgentKind): Promise<AuthStatus> {
   return st;
 }
 
+/** Suggested model ids for a backend. DeepSeek is fetched live; CLIs use stable aliases. */
+async function listModels(backend: Backend): Promise<string[]> {
+  if (backend === "claude") return ["opus", "sonnet", "haiku"]; // CLI aliases resolve to latest
+  if (backend === "codex") return []; // codex CLI has no list endpoint — free-text only
+  const key = deepseekKey();
+  const fallback = ["deepseek-chat", "deepseek-reasoner"];
+  if (!key) return fallback;
+  try {
+    const res = await fetch("https://api.deepseek.com/models", { headers: { Authorization: `Bearer ${key}` } });
+    if (!res.ok) return fallback;
+    const data = (await res.json()) as { data?: { id?: string }[] };
+    const ids = (data.data ?? []).map((d) => d.id).filter((x): x is string => !!x);
+    log("models.list", { backend, n: ids.length });
+    return ids.length ? ids.sort() : fallback;
+  } catch (e) {
+    log("models.list.error", { backend, err: String(e) });
+    return fallback;
+  }
+}
+
 function capture(path: string): void {
   void win?.webContents
     .capturePage()
@@ -445,6 +483,7 @@ app.whenReady().then(() => {
   // ---- settings ----
   ipcMain.handle(CH.settingsGet, () => getSettings());
   ipcMain.handle(CH.settingsSet, (_e, patch) => updateSettings(patch));
+  ipcMain.handle(CH.modelsList, (_e, backend: Backend) => listModels(backend));
 
   createWindow();
   app.on("activate", () => {

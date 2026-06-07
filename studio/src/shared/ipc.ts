@@ -148,6 +148,7 @@ export const CH = {
   sessionLoad: "session:load",
   settingsGet: "settings:get",
   settingsSet: "settings:set",
+  modelsList: "models:list",
 } as const;
 
 /** The surface exposed to the renderer as `window.studio`. */
@@ -190,4 +191,6 @@ export interface StudioApi {
   getSettings(): Promise<AppSettings>;
   /** Merge a partial update, persist, and return the full settings. */
   setSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
+  /** Suggested model ids for a backend (DeepSeek is fetched live; Claude/Codex are aliases). */
+  listModels(backend: Backend): Promise<string[]>;
 }

@@ -10,31 +10,9 @@ import { TopBar } from "./components/TopBar";
 const DISCONNECTED: AuthState = { claude: { connected: false }, codex: { connected: false } };
 const NO_ACTIVITY: ActivityState = { claude: "", codex: "" };
 
-const CLAUDE_MODELS = [
-  { v: "", label: "默认" },
-  { v: "claude-opus-4-8", label: "Opus 4.8" },
-  { v: "claude-opus-4-8[1m]", label: "Opus 4.8 (1M)" },
-  { v: "claude-sonnet-4-6", label: "Sonnet 4.6" },
-  { v: "claude-haiku-4-5", label: "Haiku 4.5" },
-  { v: "claude-opus-4-7", label: "Opus 4.7 (旧)" },
-  { v: "claude-opus-4-7[1m]", label: "Opus 4.7 (1M, 旧)" },
-  { v: "claude-opus-4-6", label: "Opus 4.6 (旧)" },
-];
-const CODEX_MODELS = [
-  { v: "", label: "默认" },
-  { v: "gpt-5.5", label: "GPT-5.5" },
-  { v: "gpt-5.4", label: "GPT-5.4" },
-  { v: "gpt-5.4-mini", label: "GPT-5.4-Mini" },
-  { v: "gpt-5.3-codex-spark", label: "GPT-5.3-Codex-Spark" },
-];
-const DEEPSEEK_MODELS = [
-  { v: "", label: "默认 (deepseek-chat)" },
-  { v: "deepseek-chat", label: "deepseek-chat" },
-  { v: "deepseek-reasoner", label: "deepseek-reasoner (R1)" },
-];
-const MODELS: Record<Backend, { v: string; label: string }[]> = { claude: CLAUDE_MODELS, codex: CODEX_MODELS, deepseek: DEEPSEEK_MODELS };
 const MASTER_BACKENDS: Backend[] = ["claude", "codex", "deepseek"];
-const SLAVE_BACKENDS: Backend[] = ["claude", "codex"];
+const SLAVE_BACKENDS: Backend[] = ["claude", "codex", "deepseek"];
+const NO_MODELS: Record<AgentKind, string[]> = { claude: [], codex: [] };
 
 export function App() {
   const { t } = useLang();
@@ -46,6 +24,7 @@ export function App() {
   const [mode, setMode] = useState<Mode>("solo");
   const [connecting, setConnecting] = useState<Record<AgentKind, boolean>>({ claude: false, codex: false });
   const [models, setModels] = useState<Record<AgentKind, string>>({ claude: "", codex: "" });
+  const [modelOpts, setModelOpts] = useState<Record<AgentKind, string[]>>(NO_MODELS);
   const initialHash = useMemo(() => new URLSearchParams(window.location.hash.slice(1)), []);
   const [view, setView] = useState<View>(() => {
     const h = initialHash.get("view");
@@ -132,6 +111,22 @@ export function App() {
     return b === "deepseek" ? !!dsKey : auth[b].connected;
   };
 
+  // Fetch each lane's model suggestions (DeepSeek live, Claude aliases) when its backend / key changes.
+  const masterB = settings?.masterBackend;
+  const slaveB = settings?.slaveBackend;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: backendOf is derived from these very deps
+  useEffect(() => {
+    if (!settings) return;
+    let alive = true;
+    const load = (kind: AgentKind) =>
+      void window.studio.listModels(backendOf(kind)).then((list) => alive && setModelOpts((o) => ({ ...o, [kind]: list })));
+    load("claude");
+    load("codex");
+    return () => {
+      alive = false;
+    };
+  }, [masterB, slaveB, dsKey]);
+
   const connect = async (backend: AgentKind) => {
     setConnecting((c) => ({ ...c, [backend]: true }));
     try {
@@ -172,7 +167,7 @@ export function App() {
       onConnect: () => {
         if (backend !== "deepseek") void connect(backend);
       },
-      models: MODELS[backend],
+      modelOptions: modelOpts[kind],
       model: models[kind],
       onModel: (v: string) => changeModel(kind, v),
       deepseekKey: dsKey,

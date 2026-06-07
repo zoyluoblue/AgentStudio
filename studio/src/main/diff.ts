@@ -38,6 +38,54 @@ export function snapshot(cwd: string): Snapshot {
   return m;
 }
 
+const TEXT_EXT = new Set([
+  "html", "htm", "css", "scss", "sass", "less", "js", "mjs", "cjs", "ts", "tsx", "jsx",
+  "json", "md", "txt", "svg", "vue", "xml", "yml", "yaml", "toml", "py", "rb", "go", "rs", "sh",
+]);
+
+function collectText(dir: string, base: string, acc: { path: string; content: string }[], depth: number): void {
+  if (depth > 6 || acc.length > 60) return;
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const e of entries) {
+    if (SKIP.has(e.name) || e.name.startsWith(".")) continue;
+    const full = join(dir, e.name);
+    if (e.isDirectory()) {
+      collectText(full, base, acc, depth + 1);
+    } else if (e.isFile()) {
+      const ext = e.name.split(".").pop()?.toLowerCase() ?? "";
+      if (!TEXT_EXT.has(ext)) continue;
+      try {
+        if (statSync(full).size > 200_000) continue;
+        acc.push({ path: relative(base, full), content: readFileSync(full, "utf8") });
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
+/** Concatenate the project's text files (path-headed, truncated) so a text-only LLM can edit them. */
+export function projectContext(cwd: string, budget = 16000): string {
+  const files: { path: string; content: string }[] = [];
+  collectText(cwd, cwd, files, 0);
+  let out = "";
+  for (const f of files) {
+    const body = f.content.length > 6000 ? `${f.content.slice(0, 6000)}\n…(已截断)` : f.content;
+    const chunk = `\n### ${f.path}\n\`\`\`\n${body}\n\`\`\`\n`;
+    if (out.length + chunk.length > budget) {
+      out += "\n…(其余文件略)";
+      break;
+    }
+    out += chunk;
+  }
+  return out.trim();
+}
+
 /**
  * Compare a prior snapshot to the current tree and produce a review-friendly summary
  * that INCLUDES the content of new/changed files — Claude reviews with tools disabled,

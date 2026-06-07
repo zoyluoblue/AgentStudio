@@ -1,9 +1,54 @@
-// DeepSeek backend (master/planner only): a direct OpenAI-compatible chat call.
-// DeepSeek has no CLI — it authenticates with an API key. api.deepseek.com is
-// reachable directly in CN, so this does NOT go through the proxy.
+// DeepSeek backend: a direct OpenAI-compatible chat call (api.deepseek.com is
+// reachable directly in CN, so this does NOT go through the proxy).
+// As MASTER it plans (plain text). As SLAVE/executor it has no agentic harness,
+// so we use the "emit full files" protocol below and write the files ourselves.
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, resolve, sep } from "node:path";
 import { log } from "./log.js";
 
 const ENDPOINT = "https://api.deepseek.com/chat/completions";
+
+/** System prompt that makes DeepSeek emit whole files in a parseable envelope. */
+export const DEEPSEEK_EXECUTOR_SYSTEM =
+  "你是编码执行者。根据需求直接产出完整文件内容。每个要新建或修改的文件，严格用下面的标记输出，" +
+  "标记必须独占一行，不要用 markdown 代码围栏把整段包起来，文件内容要完整、不要省略：\n" +
+  "<<<FILE: 相对路径>>>\n（完整文件内容）\n<<<END FILE>>>\n" +
+  "规则：路径相对项目根；只输出需要新建或修改的文件；可以在文件块之外用一两句中文说明你做了什么。";
+
+/** Parse the <<<FILE: path>>> … <<<END FILE>>> blocks out of DeepSeek's output. */
+export function parseFileBlocks(text: string): { files: { path: string; content: string }[]; prose: string } {
+  const files: { path: string; content: string }[] = [];
+  const re = /<<<FILE:\s*(.+?)\s*>>>\r?\n([\s\S]*?)\r?\n<<<END FILE>>>/g;
+  for (let m = re.exec(text); m !== null; m = re.exec(text)) {
+    // strip an accidental markdown fence wrapper inside the block
+    const content = m[2].replace(/^```[\w-]*\r?\n/, "").replace(/\r?\n```\s*$/, "");
+    files.push({ path: m[1].trim(), content });
+  }
+  const prose = text.replace(re, "").trim();
+  return { files, prose };
+}
+
+/** Write parsed files into cwd, refusing any path that escapes the project root. */
+export function applyFiles(cwd: string, files: { path: string; content: string }[]): string[] {
+  const root = resolve(cwd);
+  const written: string[] = [];
+  for (const f of files) {
+    const rel = f.path.replace(/^[/\\]+/, "");
+    const abs = resolve(root, rel);
+    if (abs !== root && !abs.startsWith(root + sep)) {
+      log("deepseek.write.skip", { path: f.path, reason: "escapes project root" });
+      continue;
+    }
+    try {
+      mkdirSync(dirname(abs), { recursive: true });
+      writeFileSync(abs, f.content);
+      written.push(rel);
+    } catch (e) {
+      log("deepseek.write.error", { path: rel, err: String(e) });
+    }
+  }
+  return written;
+}
 
 export interface DeepseekAsk {
   prompt: string;
@@ -20,8 +65,13 @@ export interface DeepseekResult {
 }
 
 function fakeDeepseek(ask: DeepseekAsk): Promise<DeepseekResult> {
+  const isExec = ask.systemPrompt?.includes("<<<FILE");
   const isReview = ask.prompt.includes("审查") || ask.prompt.includes("git diff");
-  const text = isReview ? "✅ 通过：DeepSeek 审查认为改动达成了目标。" : "好的（DeepSeek）：我把它拆成 3 步，交给右栏执行。";
+  const text = isExec
+    ? "我创建了一个可直接打开的单文件页面。\n<<<FILE: index.html>>>\n<!doctype html>\n<html lang=\"zh\"><head><meta charset=\"utf-8\"><title>DeepSeek</title></head>\n<body style=\"font-family:sans-serif;text-align:center;padding:40px\"><h1>🐬 DeepSeek 写的页面</h1></body></html>\n<<<END FILE>>>"
+    : isReview
+      ? "✅ 通过：DeepSeek 审查认为改动达成了目标。"
+      : "好的（DeepSeek）：我把它拆成 3 步，交给右栏执行。";
   return new Promise((resolve) => {
     const t = setTimeout(() => resolve({ ok: true, text }), Number(process.env.STUDIO_FAKE_DELAY ?? 900));
     ask.signal?.addEventListener("abort", () => {

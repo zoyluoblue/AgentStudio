@@ -2,10 +2,6 @@ import { useEffect, useState } from "react";
 import { useLang } from "../i18n";
 import type { AgentKind, AuthStatus, Backend, Lane } from "../../../shared/ipc";
 
-interface ModelOpt {
-  v: string;
-  label: string;
-}
 interface Props {
   kind: AgentKind;
   lane: Lane;
@@ -15,7 +11,8 @@ interface Props {
   status: AuthStatus;
   connecting: boolean;
   onConnect: () => void;
-  models: ModelOpt[];
+  /** suggested model ids (editable — user can also type a custom id) */
+  modelOptions: string[];
   model: string;
   onModel: (v: string) => void;
   deepseekKey: string;
@@ -29,6 +26,7 @@ const BACKEND_META: Record<Backend, { name: string; icon: string; color: string 
 };
 
 export function AgentPanelHeader({
+  kind,
   lane,
   backend,
   backendOptions,
@@ -36,7 +34,7 @@ export function AgentPanelHeader({
   status,
   connecting,
   onConnect,
-  models,
+  modelOptions,
   model,
   onModel,
   deepseekKey,
@@ -136,18 +134,20 @@ export function AgentPanelHeader({
           </button>
         )}
 
-        <select
+        <input
           value={model}
           onChange={(e) => onModel(e.target.value)}
+          list={`models-${kind}`}
           title="Model"
-          className="bg-surface-container border border-outline-variant/30 rounded-lg px-2 py-1 text-body-sm text-on-surface-variant outline-none cursor-pointer hover:text-on-surface max-w-[130px]"
-        >
-          {models.map((m) => (
-            <option key={m.v} value={m.v}>
-              {m.v === "" ? t("modelDefault") : m.label}
-            </option>
+          placeholder={t("modelDefault")}
+          spellCheck={false}
+          className="w-[130px] bg-surface-container border border-outline-variant/30 rounded-lg px-2 py-1 text-body-sm text-on-surface-variant outline-none hover:text-on-surface focus:ring-2 focus:ring-primary/30"
+        />
+        <datalist id={`models-${kind}`}>
+          {modelOptions.map((m) => (
+            <option key={m} value={m} />
           ))}
-        </select>
+        </datalist>
       </div>
     </div>
   );

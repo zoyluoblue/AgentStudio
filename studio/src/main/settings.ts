@@ -14,6 +14,7 @@ const DEFAULTS: AppSettings = {
   slaveBackend: "codex",
   connectMethod: { claude: "app", codex: "app", deepseek: "key" },
   apiKeys: { claude: "", codex: "", deepseek: "" },
+  autoMemory: true,
 };
 const PROXY_KEYS = ["HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"];
 

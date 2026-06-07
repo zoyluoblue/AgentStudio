@@ -134,8 +134,30 @@ const STR = {
   },
   memChars: { zh: "字数", en: "Characters" },
   memHint: {
-    zh: "在对话框输入「记住：…」也可快速追加一条记忆。记忆过长会被截断，建议精简。",
-    en: "Type “记住：…” (remember: …) in chat to quickly append a note. Very long memory is truncated — keep it concise.",
+    zh: "在对话框输入「记住：…」「别忘了：…」也可快速追加一条手写记忆。记忆过长会被截断，建议精简。",
+    en: "Type “记住：…”, “别忘了：…” (remember/don't forget) in chat to append a manual note. Very long memory is truncated — keep it concise.",
+  },
+  memKindCurated: { zh: "手写记忆", en: "Manual" },
+  memKindLearned: { zh: "自动记忆", en: "Auto" },
+  memLearnedEmpty: { zh: "（对话结束后会自动概括存入这里）", en: "(auto-summarized here after conversations)" },
+  memHintLearned: {
+    zh: "这些是从对话里自动概括出来的，可手动编辑、「整理」去重压缩，或「清空」。",
+    en: "Auto-summarized from your conversations — edit, “Tidy” to dedup/compress, or “Clear”.",
+  },
+  memConsolidate: { zh: "整理", en: "Tidy" },
+  memConsolidating: { zh: "整理中…", en: "Tidying…" },
+  memClear: { zh: "清空", en: "Clear" },
+  memClearConfirm: { zh: "确定清空这部分自动记忆？此操作不可撤销。", en: "Clear this auto memory? This cannot be undone." },
+  // ---- settings: memory ----
+  secMemory: { zh: "记忆", en: "Memory" },
+  secMemorySub: { zh: "让模型从对话里自动概括并长期记住要点。", en: "Let models auto-summarize and remember key points from conversations." },
+  autoMemOn: { zh: "自动记忆", en: "Auto memory" },
+  autoMemOnHint: { zh: "对话结束后自动概括存入「自动记忆」。", en: "Summarize into Auto memory when a conversation ends." },
+  autoMemOff: { zh: "关闭", en: "Off" },
+  autoMemOffHint: { zh: "只保留手写记忆与「记住」指令。", en: "Keep only manual memory and explicit “记住”." },
+  autoMemTriggers: {
+    zh: "触发词（开头）：记住 / 记一下 / 别忘了 / 牢记 / 以后记得 …（remember / don't forget / note that）→ 直接存入手写记忆。",
+    en: "Trigger words (at start): 记住 / 别忘了 / remember / don't forget / note that … → saved straight to Manual memory.",
   },
 } as const;
 

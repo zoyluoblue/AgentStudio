@@ -55,6 +55,7 @@ export function SettingsView({ settings, onChange }: Props) {
   const theme = settings?.theme ?? "system";
   const proxyMode = settings?.proxyMode ?? "system";
   const proxyScope = settings?.proxyScope ?? "both";
+  const autoMemory = settings?.autoMemory ?? true;
   const setTheme = (m: ThemeMode) => onChange({ theme: m });
   const setProxyMode = (m: ProxyMode) => onChange({ proxyMode: m });
   const setProxyScope = (s: ProxyScope) => onChange({ proxyScope: s });
@@ -160,6 +161,30 @@ export function SettingsView({ settings, onChange }: Props) {
             <p className="text-body-sm text-on-surface-variant/70 mt-3 flex items-center gap-1.5">
               <span className="material-symbols-outlined text-[15px]">info</span>
               {t("proxyApplyNote")}
+            </p>
+          </Section>
+
+          {/* Memory */}
+          <Section title={t("secMemory")} sub={t("secMemorySub")}>
+            <div className="flex flex-wrap gap-2">
+              <Choice
+                active={autoMemory}
+                icon="auto_awesome"
+                label={t("autoMemOn")}
+                hint={t("autoMemOnHint")}
+                onClick={() => onChange({ autoMemory: true })}
+              />
+              <Choice
+                active={!autoMemory}
+                icon="block"
+                label={t("autoMemOff")}
+                hint={t("autoMemOffHint")}
+                onClick={() => onChange({ autoMemory: false })}
+              />
+            </div>
+            <p className="text-body-sm text-on-surface-variant/70 mt-3 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[15px]">info</span>
+              {t("autoMemTriggers")}
             </p>
           </Section>
         </div>

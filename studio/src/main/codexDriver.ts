@@ -37,6 +37,9 @@ function buildArgs(ask: CodexAsk): string[] {
   const a: string[] = ["exec"];
   if (ask.threadId) a.push("resume", ask.threadId);
   a.push("--json", "--skip-git-repo-check");
+  // Isolate from the machine's own Codex memory (~/.codex/memories etc.) — AgentStudio injects
+  // its own memory instead, so every lane uses only our memory. `-c` works for exec + resume.
+  a.push("-c", "features.memories=false", "-c", "features.goals=false", "-c", "features.chronicle=false");
   // `codex exec resume` has no -s flag; set the sandbox via a config override.
   if (ask.threadId) a.push("-c", `sandbox_mode=${sandbox}`);
   else a.push("-s", sandbox);

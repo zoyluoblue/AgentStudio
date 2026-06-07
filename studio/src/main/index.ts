@@ -11,6 +11,7 @@ import {
   CH,
   type ChatMessage,
   type Lane,
+  type MemoryKind,
   type MemoryScope,
   type Mode,
   type ModelOption,
@@ -27,12 +28,17 @@ import { changesSince, projectContext, snapshot } from "./diff.js";
 import { fixPath } from "./fixPath.js";
 import { log, setLogFile, setLogSink } from "./log.js";
 import {
+  appendLearned,
   appendMemory,
+  getGlobalLearned,
   getGlobalMemory,
+  getProjectLearned,
   getProjectMemory,
   initMemory,
   memoryContext,
+  setGlobalLearned,
   setGlobalMemory,
+  setProjectLearned,
   setProjectMemory,
 } from "./memory.js";
 import { apiKeyFor, backendFor, connectMethodFor, getSettings, initSettings, updateSettings } from "./settings.js";
@@ -273,11 +279,13 @@ async function runOrchestration(goal: string): Promise<void> {
     if (verdictPass(review.text)) {
       post("system", "text", `✅ 完成：${BACKEND_NAME[backendFor("master")]} 审查通过。`, false, undefined, "claude");
       log("orchestration.done", { iter });
+      void autoExtractMemory(`目标：${goal}\n计划：${plan.text}\n审查：${review.text}`, backendFor("master"));
       return;
     }
     if (iter === MAX_REVISE - 1) {
       post("system", "text", `已自动修改 ${MAX_REVISE} 轮仍未通过，请人工查看或补充说明。`, false, undefined, "claude");
       log("orchestration.exhausted");
+      void autoExtractMemory(`目标：${goal}\n计划：${plan.text}\n最近审查：${review.text}`, backendFor("master"));
       return;
     }
     const revise = await laneTurn("codex", withIntervene(revisePrompt(review.text), "codex"), EXECUTOR_SYSTEM, "修订中", true);
@@ -286,14 +294,60 @@ async function runOrchestration(goal: string): Promise<void> {
   }
 }
 
+// ---- learned memory: auto-extract durable facts from a finished conversation (Codex/CC style) ----
+const MEMORY_EXTRACT_SYSTEM =
+  "你是记忆助理。从对话中提炼“值得长期记住”的稳定信息：用户偏好、项目约定、技术栈选择、明确决定、踩过的坑。" +
+  "忽略一次性的、临时的、显而易见的内容。不要重复“已有记忆”里已存在的条目。" +
+  "只输出新增条目，每行一条、精炼中文、不加序号；若没有值得记的，只输出“无”。";
+const MEMORY_CONSOLIDATE_SYSTEM =
+  "你是记忆整理助手。把给定的记忆条目去重、合并同类项、精简措辞，保留全部关键信息。只输出整理后的要点列表，每行一条，不要解释。";
+
+/** One-shot text completion for memory extraction/consolidation — cheap model, no memory injection. */
+async function llmComplete(backend: Backend, prompt: string, system: string): Promise<string> {
+  const cwd = authCwd();
+  const keyOf = (b: Backend) => (connectMethodFor(b) === "key" ? apiKeyFor(b) || undefined : undefined);
+  try {
+    if (backend === "deepseek") {
+      const r = await askDeepseek({ prompt, systemPrompt: system, model: "deepseek-chat", apiKey: apiKeyFor("deepseek") });
+      return r.ok ? r.text : "";
+    }
+    if (backend === "claude") {
+      const r = await askClaude({ prompt, cwd, systemPrompt: system, disableTools: true, model: "haiku", lane: "master", apiKey: keyOf("claude") });
+      return r.ok ? r.text : "";
+    }
+    const r = await askCodex({ prompt: `${system}\n\n${prompt}`, cwd, sandbox: "read-only", lane: "master", apiKey: keyOf("codex") });
+    return r.ok ? r.text : "";
+  } catch (e) {
+    log("memory.llm.error", { backend, err: String(e) });
+    return "";
+  }
+}
+
+/** Silently extract durable facts from a finished conversation into learned memory. */
+async function autoExtractMemory(transcript: string, backend: Backend): Promise<void> {
+  if (!getSettings().autoMemory) return;
+  const cwd = projectCwd;
+  const known = `${cwd ? getProjectMemory(cwd) : getGlobalMemory()}\n${cwd ? getProjectLearned(cwd) : getGlobalLearned()}`.trim();
+  const prompt =
+    `已有记忆（不要重复其中已有的）：\n${known || "（空）"}\n\n本次对话：\n${transcript.slice(0, 6000)}\n\n请只输出新增、值得长期记住的要点：`;
+  const text = await llmComplete(backend, prompt, MEMORY_EXTRACT_SYSTEM);
+  const lines = text
+    .split("\n")
+    .map((s) => s.replace(/^[-*•\d.、)\s]+/, "").trim())
+    .filter((l) => l && l !== "无" && l.length > 2);
+  if (lines.length) appendLearned(cwd, lines);
+}
+
 async function handleSend(text: string, target: AgentKind): Promise<void> {
   if (!projectCwd) {
     post("system", "error", "请先选择一个项目文件夹。", false, undefined, target);
     return;
   }
 
-  // 记住：xxx — store a fact in long-term memory instead of running a turn.
-  const remember = text.match(/^\s*(?:记住|remember)\s*(?:[:：]|\s)\s*([\s\S]+?)\s*$/i);
+  // 记住/别忘了/… xxx — store a fact in curated memory instead of running a turn.
+  const remember = text.match(
+    /^\s*(?:记住|记一下|记下来|记下|别忘了|别忘记|不要忘记|不要忘|牢记|务必记住|以后记得|以后注意|请记住|remember|don'?t forget|note that|keep in mind|make a note)\s*(?:[:：,，]|\s)\s*([\s\S]+?)\s*$/i,
+  );
   if (remember?.[1]) {
     const fact = remember[1].trim();
     appendMemory(projectCwd, fact);
@@ -324,15 +378,18 @@ async function handleSend(text: string, target: AgentKind): Promise<void> {
   } else {
     post("user", "text", text, false, undefined, target);
     let next: string | null = text;
+    let lastReply = "";
     while (next) {
       const res =
         target === "claude"
           ? await laneTurn("claude", next, PLANNER_SYSTEM, "思考中", false)
           : await laneTurn("codex", next, EXECUTOR_SYSTEM, "执行中", true);
       if (!res.ok) break;
+      lastReply = res.text;
       next = intervene[target] || null; // a follow-up that was interjected mid-turn
       intervene[target] = "";
     }
+    if (lastReply) void autoExtractMemory(`用户：${text}\n助手：${lastReply}`, backendFor(laneOf(target)));
   }
 }
 
@@ -590,10 +647,25 @@ app.whenReady().then(() => {
   ipcMain.handle(CH.modelsList, (_e, backend: Backend) => listModels(backend));
 
   // ---- memory ----
-  ipcMain.handle(CH.memoryGet, (_e, scope: MemoryScope) => (scope === "global" ? getGlobalMemory() : getProjectMemory(projectCwd)));
-  ipcMain.handle(CH.memorySet, (_e, p: { scope: MemoryScope; content: string }) => {
-    if (p.scope === "global") setGlobalMemory(p.content);
+  ipcMain.handle(CH.memoryGet, (_e, p: { scope: MemoryScope; kind?: MemoryKind }) => {
+    if (p.kind === "learned") return p.scope === "global" ? getGlobalLearned() : getProjectLearned(projectCwd);
+    return p.scope === "global" ? getGlobalMemory() : getProjectMemory(projectCwd);
+  });
+  ipcMain.handle(CH.memorySet, (_e, p: { scope: MemoryScope; content: string; kind?: MemoryKind }) => {
+    if (p.kind === "learned") {
+      if (p.scope === "global") setGlobalLearned(p.content);
+      else setProjectLearned(projectCwd, p.content);
+    } else if (p.scope === "global") setGlobalMemory(p.content);
     else setProjectMemory(projectCwd, p.content);
+  });
+  ipcMain.handle(CH.memoryConsolidate, async (_e, scope: MemoryScope) => {
+    const cur = scope === "global" ? getGlobalLearned() : getProjectLearned(projectCwd);
+    if (!cur.trim()) return cur;
+    const cleaned = (await llmComplete(backendFor("master"), `请整理以下记忆：\n\n${cur}`, MEMORY_CONSOLIDATE_SYSTEM)).trim();
+    if (!cleaned) return cur;
+    if (scope === "global") setGlobalLearned(cleaned);
+    else setProjectLearned(projectCwd, cleaned);
+    return cleaned;
   });
 
   createWindow();

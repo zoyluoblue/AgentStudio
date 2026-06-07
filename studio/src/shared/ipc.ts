@@ -104,6 +104,8 @@ export interface ModelOption {
 
 /** Long-term memory scope: global (all projects) or the current project only. */
 export type MemoryScope = "global" | "project";
+/** Memory kind: curated (user-written / explicit "记住") or learned (auto-extracted from chats). */
+export type MemoryKind = "curated" | "learned";
 
 /** User preferences, persisted to userData/settings.json. */
 export interface AppSettings {
@@ -122,6 +124,8 @@ export interface AppSettings {
   connectMethod: Record<Backend, ConnectMethod>;
   /** Per-backend API key: claude→ANTHROPIC_API_KEY, codex→OPENAI_API_KEY, deepseek→DeepSeek key */
   apiKeys: Record<Backend, string>;
+  /** Auto-extract learned memory from finished conversations (Codex/CC-style). */
+  autoMemory: boolean;
 }
 
 /** Payload pushed to the renderer when a saved session is resumed into the live chat. */
@@ -165,6 +169,7 @@ export const CH = {
   modelsList: "models:list",
   memoryGet: "memory:get",
   memorySet: "memory:set",
+  memoryConsolidate: "memory:consolidate",
 } as const;
 
 /** The surface exposed to the renderer as `window.studio`. */
@@ -212,8 +217,10 @@ export interface StudioApi {
   /** Selectable models for a backend (Codex from its local cache, DeepSeek/Anthropic fetched live, Claude curated). */
   listModels(backend: Backend): Promise<ModelOption[]>;
   // ---- memory ----
-  /** Read long-term memory for a scope (project scope returns "" when no project is open). */
-  getMemory(scope: MemoryScope): Promise<string>;
-  /** Replace long-term memory for a scope. */
-  setMemory(scope: MemoryScope, content: string): Promise<void>;
+  /** Read long-term memory for a scope+kind (project scope returns "" when no project is open). */
+  getMemory(scope: MemoryScope, kind?: MemoryKind): Promise<string>;
+  /** Replace long-term memory for a scope+kind. */
+  setMemory(scope: MemoryScope, content: string, kind?: MemoryKind): Promise<void>;
+  /** Dedup/compress the learned memory of a scope (returns the consolidated text). */
+  consolidateMemory(scope: MemoryScope): Promise<string>;
 }

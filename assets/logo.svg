@@ -1,0 +1,35 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AgentStudio">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4A7CFF"/>
+      <stop offset="1" stop-color="#0050CB"/>
+    </linearGradient>
+    <linearGradient id="core" x1="102" y1="102" x2="154" y2="154" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DCE7FF"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#001A4D" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <rect width="256" height="256" rx="60" fill="url(#tile)"/>
+
+  <!-- orchestration links: a central hub connecting two planner + two executor nodes -->
+  <g stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="9" stroke-linecap="round">
+    <line x1="128" y1="128" x2="78"  y2="74"/>
+    <line x1="128" y1="128" x2="182" y2="74"/>
+    <line x1="128" y1="128" x2="78"  y2="182"/>
+    <line x1="128" y1="128" x2="182" y2="182"/>
+  </g>
+
+  <!-- satellite agent nodes -->
+  <g filter="url(#soft)">
+    <circle cx="78"  cy="74"  r="17" fill="#FFFFFF"/>
+    <circle cx="182" cy="74"  r="17" fill="#FFFFFF"/>
+    <circle cx="78"  cy="182" r="17" fill="#FFFFFF"/>
+    <circle cx="182" cy="182" r="17" fill="#FFFFFF"/>
+    <!-- central hub (the studio) -->
+    <circle cx="128" cy="128" r="28" fill="url(#core)"/>
+  </g>
+</svg>

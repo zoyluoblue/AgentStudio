@@ -13,6 +13,8 @@ export interface CodexAsk {
   threadId?: string;
   sandbox?: Sandbox;
   model?: string;
+  /** API key (api-key method): injected as OPENAI_API_KEY. Omit to use the ChatGPT login. */
+  apiKey?: string;
   /** lane this run belongs to (for proxy scoping) */
   lane?: Lane;
   signal?: AbortSignal;
@@ -117,6 +119,7 @@ export function askCodex(ask: CodexAsk): Promise<CodexResult> {
     log("codex.exec", { argv: args.slice(0, -1), promptLen: ask.prompt.length, cwd: ask.cwd });
     // stdin MUST be ignored: codex reads piped stdin as input and hangs waiting for EOF otherwise.
     const env = applyProxy({ ...process.env }, ask.lane ?? "slave"); // honor proxy setting + scope
+    if (ask.apiKey) env.OPENAI_API_KEY = ask.apiKey; // api-key method: authenticate with the key, not the ChatGPT login
     const child: ChildProcess = spawn(bin, args, { cwd: ask.cwd, env, stdio: ["ignore", "pipe", "pipe"] });
 
     const onEvent = (ev: Record<string, unknown>) => {

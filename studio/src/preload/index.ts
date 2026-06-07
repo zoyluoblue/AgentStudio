@@ -58,6 +58,7 @@ const api: StudioApi = {
   },
   getAuth: () => ipcRenderer.invoke(CH.authGet),
   connect: (kind: AgentKind) => ipcRenderer.invoke(CH.authConnect, kind),
+  disconnect: (kind: AgentKind) => ipcRenderer.invoke(CH.authDisconnect, kind),
   onAuth: (cb) => {
     const h = (_e: IpcRendererEvent, s: AuthState) => cb(s);
     ipcRenderer.on(CH.authEvent, h);

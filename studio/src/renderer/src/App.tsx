@@ -1,6 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLang } from "./i18n";
-import type { ActivityState, AgentKind, AppSettings, AuthState, Backend, BusyState, ChatMessage, Lane, Mode, ProjectInfo } from "../../shared/ipc";
+import type {
+  ActivityState,
+  AgentKind,
+  AppSettings,
+  AuthState,
+  AuthStatus,
+  Backend,
+  BusyState,
+  ChatMessage,
+  ConnectMethod,
+  Lane,
+  Mode,
+  ModelOption,
+  ProjectInfo,
+} from "../../shared/ipc";
 import { AgentPanel } from "./components/AgentPanel";
 import { HistoryView } from "./components/HistoryView";
 import { SettingsView } from "./components/SettingsView";
@@ -12,7 +26,7 @@ const NO_ACTIVITY: ActivityState = { claude: "", codex: "" };
 
 const MASTER_BACKENDS: Backend[] = ["claude", "codex", "deepseek"];
 const SLAVE_BACKENDS: Backend[] = ["claude", "codex", "deepseek"];
-const NO_MODELS: Record<AgentKind, string[]> = { claude: [], codex: [] };
+const NO_MODELS: Record<AgentKind, ModelOption[]> = { claude: [], codex: [] };
 
 export function App() {
   const { t } = useLang();
@@ -24,7 +38,7 @@ export function App() {
   const [mode, setMode] = useState<Mode>("solo");
   const [connecting, setConnecting] = useState<Record<AgentKind, boolean>>({ claude: false, codex: false });
   const [models, setModels] = useState<Record<AgentKind, string>>({ claude: "", codex: "" });
-  const [modelOpts, setModelOpts] = useState<Record<AgentKind, string[]>>(NO_MODELS);
+  const [modelOpts, setModelOpts] = useState<Record<AgentKind, ModelOption[]>>(NO_MODELS);
   const initialHash = useMemo(() => new URLSearchParams(window.location.hash.slice(1)), []);
   const [view, setView] = useState<View>(() => {
     const h = initialHash.get("view");
@@ -103,18 +117,26 @@ export function App() {
   const claudeMsgs = useMemo(() => messages.filter((m) => m.lane === "claude"), [messages]);
   const codexMsgs = useMemo(() => messages.filter((m) => m.lane === "codex"), [messages]);
 
-  const dsKey = settings?.deepseekApiKey ?? "";
   const backendOf = (kind: AgentKind): Backend =>
     (kind === "claude" ? settings?.masterBackend : settings?.slaveBackend) ?? (kind === "claude" ? "claude" : "codex");
-  const laneReady = (kind: AgentKind): boolean => {
-    const b = backendOf(kind);
-    return b === "deepseek" ? !!dsKey : auth[b].connected;
-  };
+  // DeepSeek has no app login, so it is always key-mode.
+  const methodOf = (b: Backend): ConnectMethod => (b === "deepseek" ? "key" : (settings?.connectMethod[b] ?? "app"));
+  const keyOf = (b: Backend): string => settings?.apiKeys[b] ?? "";
+  // A backend is connected if its key is set (key mode) or its CLI login was detected (app mode).
+  const backendStatus = (b: Backend): AuthStatus =>
+    methodOf(b) === "key" ? { connected: !!keyOf(b).trim() } : (auth[b as "claude" | "codex"] ?? { connected: false });
+  const laneReady = (kind: AgentKind): boolean => backendStatus(backendOf(kind)).connected;
 
-  // Fetch each lane's model suggestions (DeepSeek live, Claude aliases) when its backend / key changes.
+  // Fetch each lane's model suggestions when its backend / method / key / connection changes
+  // (live provider list in key mode, CLI aliases otherwise — see main/listModels).
   const masterB = settings?.masterBackend;
   const slaveB = settings?.slaveBackend;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: backendOf is derived from these very deps
+  const connSig = JSON.stringify({
+    m: settings?.connectMethod,
+    k: settings?.apiKeys,
+    a: { claude: auth.claude.connected, codex: auth.codex.connected },
+  });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: backendOf is derived from masterB/slaveB; connSig captures method/key/auth
   useEffect(() => {
     if (!settings) return;
     let alive = true;
@@ -125,7 +147,7 @@ export function App() {
     return () => {
       alive = false;
     };
-  }, [masterB, slaveB, dsKey]);
+  }, [masterB, slaveB, connSig]);
 
   const connect = async (backend: AgentKind) => {
     setConnecting((c) => ({ ...c, [backend]: true }));
@@ -136,6 +158,18 @@ export function App() {
       setConnecting((c) => ({ ...c, [backend]: false }));
     }
   };
+  // Disconnect: key mode clears the stored key; app mode forgets the in-app login (CLI stays logged in).
+  const disconnect = async (b: Backend) => {
+    if (!settings) return;
+    if (methodOf(b) === "key") {
+      void changeSettings({ apiKeys: { ...settings.apiKeys, [b]: "" } });
+      return;
+    }
+    await window.studio.disconnect(b as AgentKind);
+    setAuth((a) => ({ ...a, [b]: { connected: false } }));
+  };
+  const refreshModels = (kind: AgentKind) =>
+    void window.studio.listModels(backendOf(kind)).then((list) => setModelOpts((o) => ({ ...o, [kind]: list })));
   const changeMode = (m: Mode) => {
     setMode(m);
     window.studio.setMode(m);
@@ -156,22 +190,32 @@ export function App() {
   const headerProps = (kind: AgentKind) => {
     const lane: Lane = kind === "claude" ? "master" : "slave";
     const backend = backendOf(kind);
+    const method = methodOf(backend);
+    const appConnectable = method === "app" && backend !== "deepseek";
     return {
       kind,
       lane,
       backend,
       backendOptions: kind === "claude" ? MASTER_BACKENDS : SLAVE_BACKENDS,
       onBackend: (b: Backend) => changeBackend(kind, b),
-      status: backend === "deepseek" ? { connected: !!dsKey } : auth[backend],
-      connecting: backend === "deepseek" ? false : connecting[backend],
-      onConnect: () => {
-        if (backend !== "deepseek") void connect(backend);
+      method,
+      onMethod: (m: ConnectMethod) => {
+        if (settings) void changeSettings({ connectMethod: { ...settings.connectMethod, [backend]: m } });
       },
+      apiKey: keyOf(backend),
+      onApiKey: (v: string) => {
+        if (settings) void changeSettings({ apiKeys: { ...settings.apiKeys, [backend]: v } });
+      },
+      status: backendStatus(backend),
+      connecting: appConnectable ? connecting[backend as "claude" | "codex"] : false,
+      onConnect: () => {
+        if (appConnectable) void connect(backend as AgentKind);
+      },
+      onDisconnect: () => void disconnect(backend),
       modelOptions: modelOpts[kind],
       model: models[kind],
       onModel: (v: string) => changeModel(kind, v),
-      deepseekKey: dsKey,
-      onDeepseekKey: (v: string) => void changeSettings({ deepseekApiKey: v }),
+      onRefreshModels: () => refreshModels(kind),
     };
   };
 

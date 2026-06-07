@@ -18,7 +18,11 @@ const STR = {
   connect: { zh: "连接", en: "Connect" },
   connecting: { zh: "连接中…", en: "Connecting…" },
   connected: { zh: "已连接", en: "Connected" },
+  disconnect: { zh: "断开", en: "Disconnect" },
+  methodApp: { zh: "App 登录", en: "App login" },
+  methodKey: { zh: "API Key", en: "API Key" },
   modelDefault: { zh: "默认", en: "Default" },
+  modelRefresh: { zh: "刷新模型列表", en: "Refresh models" },
   you: { zh: "你", en: "You" },
   system: { zh: "系统", en: "System" },
   thinking: { zh: "思考中", en: "Thinking" },
@@ -106,10 +110,9 @@ const STR = {
   scopeMaster: { zh: "仅 Master（左栏）", en: "Master only (left)" },
   scopeSlave: { zh: "仅 Slave（右栏）", en: "Slave only (right)" },
   scopeBoth: { zh: "全部", en: "Both" },
-  // ---- backend / deepseek ----
-  deepseekKeyPh: { zh: "DeepSeek API Key", en: "DeepSeek API Key" },
-  deepseekKeySet: { zh: "Key 已配置", en: "Key set" },
-  deepseekKeyEdit: { zh: "点击修改 API Key", en: "Click to edit API Key" },
+  // ---- backend / api key ----
+  apiKeySet: { zh: "Key 已配置", en: "Key set" },
+  apiKeyEdit: { zh: "点击修改 API Key", en: "Click to edit API key" },
   // ---- history search ----
   historySearchPh: { zh: "搜索历史对话内容…", en: "Search conversation content…" },
 } as const;

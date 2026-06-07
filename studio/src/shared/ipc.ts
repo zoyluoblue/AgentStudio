@@ -93,6 +93,14 @@ export type ProxyMode = "system" | "custom" | "none";
 /** Which lanes the proxy applies to. */
 export type ProxyScope = "master" | "slave" | "both";
 export type ThemeMode = "system" | "light" | "dark";
+/** How a backend authenticates: app = CLI / OAuth login, key = API key. */
+export type ConnectMethod = "app" | "key";
+
+/** A selectable model: `id` is passed to the CLI/API; `label` is the friendly display name. */
+export interface ModelOption {
+  id: string;
+  label: string;
+}
 
 /** User preferences, persisted to userData/settings.json. */
 export interface AppSettings {
@@ -107,8 +115,10 @@ export interface AppSettings {
   masterBackend: Backend;
   /** LLM running in the right (slave/executor) lane */
   slaveBackend: Backend;
-  /** DeepSeek API key (DeepSeek has no CLI login) */
-  deepseekApiKey: string;
+  /** Per-backend auth method. DeepSeek is always "key" (no CLI login). */
+  connectMethod: Record<Backend, ConnectMethod>;
+  /** Per-backend API key: claude→ANTHROPIC_API_KEY, codex→OPENAI_API_KEY, deepseek→DeepSeek key */
+  apiKeys: Record<Backend, string>;
 }
 
 /** Payload pushed to the renderer when a saved session is resumed into the live chat. */
@@ -131,6 +141,7 @@ export const CH = {
   projectEvent: "project:event",
   authGet: "auth:get",
   authConnect: "auth:connect",
+  authDisconnect: "auth:disconnect",
   authEvent: "auth:event",
   modeGet: "mode:get",
   modeSet: "mode:set",
@@ -174,6 +185,8 @@ export interface StudioApi {
   onProject(cb: (p: ProjectInfo) => void): () => void;
   getAuth(): Promise<AuthState>;
   connect(kind: AgentKind): Promise<AuthStatus>;
+  /** Forget an app-login connection inside the app (does NOT log the CLI out globally). */
+  disconnect(kind: AgentKind): Promise<void>;
   onAuth(cb: (s: AuthState) => void): () => void;
   // ---- history & search ----
   /** All saved conversations, newest first. */
@@ -191,6 +204,6 @@ export interface StudioApi {
   getSettings(): Promise<AppSettings>;
   /** Merge a partial update, persist, and return the full settings. */
   setSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
-  /** Suggested model ids for a backend (DeepSeek is fetched live; Claude/Codex are aliases). */
-  listModels(backend: Backend): Promise<string[]>;
+  /** Selectable models for a backend (Codex from its local cache, DeepSeek/Anthropic fetched live, Claude curated). */
+  listModels(backend: Backend): Promise<ModelOption[]>;
 }

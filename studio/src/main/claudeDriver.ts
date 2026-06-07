@@ -11,6 +11,8 @@ export interface ClaudeAsk {
   sessionId?: string;
   systemPrompt?: string;
   model?: string;
+  /** API key (api-key method): injected as ANTHROPIC_API_KEY. Omit to use the CLI login. */
+  apiKey?: string;
   /** inline JSON Schema -> forces structured output (returned in `structured`) */
   schema?: unknown;
   /** disable ALL tools so Claude answers directly in one turn (no agentic wandering) */
@@ -101,8 +103,10 @@ function parseEnvelope(out: string, code: number | null, err: string): ClaudeRes
  * Build a clean env for the spawned claude: drop a proxy base URL / injected API keys
  * and harness vars so it uses the default endpoint + the user's normal login. This fixes
  * "socket connection closed unexpectedly" when a proxy with a short timeout drops long requests.
+ * When `apiKey` is given (api-key method) we re-add it as ANTHROPIC_API_KEY so the CLI
+ * authenticates with the key instead of the interactive login.
  */
-function spawnEnv(lane: Lane): NodeJS.ProcessEnv {
+function spawnEnv(lane: Lane, apiKey?: string): NodeJS.ProcessEnv {
   const e: NodeJS.ProcessEnv = {};
   for (const [k, v] of Object.entries(process.env)) {
     if (v === undefined) continue;
@@ -110,6 +114,7 @@ function spawnEnv(lane: Lane): NodeJS.ProcessEnv {
     if (k === "ANTHROPIC_BASE_URL" || k === "ANTHROPIC_API_KEY" || k === "ANTHROPIC_AUTH_TOKEN" || k === "ANTHROPIC_MODEL") continue;
     e[k] = v;
   }
+  if (apiKey) e.ANTHROPIC_API_KEY = apiKey;
   return applyProxy(e, lane); // honor the user's proxy setting + scope for this lane
 }
 
@@ -139,7 +144,7 @@ function askClaudeOnce(ask: ClaudeAsk): Promise<ClaudeResult> {
     };
 
     log("claude.exec", { model: ask.model || "default", lane, write: !!ask.allowWrite, resume: !!ask.sessionId, cwd: ask.cwd });
-    const child = spawn(bin, argv, { cwd: ask.cwd, stdio: ["ignore", "pipe", "pipe"], env: spawnEnv(lane) });
+    const child = spawn(bin, argv, { cwd: ask.cwd, stdio: ["ignore", "pipe", "pipe"], env: spawnEnv(lane, ask.apiKey) });
     ask.signal?.addEventListener("abort", () => {
       try {
         child.kill("SIGKILL");

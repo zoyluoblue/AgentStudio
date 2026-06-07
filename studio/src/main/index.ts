@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { BrowserWindow, app, dialog, ipcMain } from "electron";
@@ -12,6 +12,7 @@ import {
   type ChatMessage,
   type Lane,
   type Mode,
+  type ModelOption,
   type MsgKind,
   type ProjectInfo,
   type Role,
@@ -24,7 +25,7 @@ import { DEEPSEEK_EXECUTOR_SYSTEM, applyFiles, askDeepseek, parseFileBlocks } fr
 import { changesSince, projectContext, snapshot } from "./diff.js";
 import { fixPath } from "./fixPath.js";
 import { log, setLogFile, setLogSink } from "./log.js";
-import { backendFor, deepseekKey, getSettings, initSettings, updateSettings } from "./settings.js";
+import { apiKeyFor, backendFor, connectMethodFor, getSettings, initSettings, updateSettings } from "./settings.js";
 import * as store from "./store.js";
 
 // GUI apps don't inherit the shell PATH — repair it so claude/codex/git resolve.
@@ -150,6 +151,8 @@ async function laneTurn(kind: AgentKind, prompt: string, system: string, phase: 
   const lane = laneOf(kind);
   const backend = backendFor(lane);
   const name = BACKEND_NAME[backend];
+  // api-key method: hand the CLI/driver the configured key; app method leaves it undefined (uses login).
+  const apiKey = connectMethodFor(backend) === "key" ? apiKeyFor(backend) || undefined : undefined;
   const pid = post(kind, write ? "progress" : "text", write ? `${name} 正在处理…` : "", true, undefined, kind, name);
   setActivity(kind, phase);
   aborts[kind] = new AbortController();
@@ -168,6 +171,7 @@ async function laneTurn(kind: AgentKind, prompt: string, system: string, phase: 
       allowWrite: write,
       lane,
       model,
+      apiKey,
       signal,
       onStatus: (s) => setActivity(kind, s),
     });
@@ -181,6 +185,7 @@ async function laneTurn(kind: AgentKind, prompt: string, system: string, phase: 
       sandbox: write ? "workspace-write" : "read-only",
       lane,
       model,
+      apiKey,
       signal,
       onDelta: (t) => post(kind, "text", t, true, pid, kind, name),
       onStatus: (s) => setActivity(kind, s),
@@ -193,7 +198,7 @@ async function laneTurn(kind: AgentKind, prompt: string, system: string, phase: 
     // (with the current files as context) and WE write them; the master then reviews the diff.
     const ctx = projectContext(projectCwd as string);
     const full = `${prompt}\n\n当前项目文件（在此基础上新建/修改；为空则从零创建）：\n${ctx || "（空项目）"}`;
-    const r = await askDeepseek({ prompt: full, systemPrompt: DEEPSEEK_EXECUTOR_SYSTEM, model, apiKey: deepseekKey(), signal });
+    const r = await askDeepseek({ prompt: full, systemPrompt: DEEPSEEK_EXECUTOR_SYSTEM, model, apiKey: apiKeyFor("deepseek"), signal });
     if (!r.ok) {
       res = { ok: false, text: "", error: r.error };
     } else {
@@ -207,7 +212,7 @@ async function laneTurn(kind: AgentKind, prompt: string, system: string, phase: 
       res = { ok: true, text: (prose || "（已处理）") + summary };
     }
   } else {
-    const r = await askDeepseek({ prompt, systemPrompt: system, model, apiKey: deepseekKey(), signal });
+    const r = await askDeepseek({ prompt, systemPrompt: system, model, apiKey: apiKeyFor("deepseek"), signal });
     res = { ok: r.ok, text: r.text, error: r.error };
   }
 
@@ -348,24 +353,88 @@ async function connectAgent(kind: AgentKind): Promise<AuthStatus> {
   return st;
 }
 
-/** Suggested model ids for a backend. DeepSeek is fetched live; CLIs use stable aliases. */
-async function listModels(backend: Backend): Promise<string[]> {
-  if (backend === "claude") return ["opus", "sonnet", "haiku"]; // CLI aliases resolve to latest
-  if (backend === "codex") return []; // codex CLI has no list endpoint — free-text only
-  const key = deepseekKey();
-  const fallback = ["deepseek-chat", "deepseek-reasoner"];
-  if (!key) return fallback;
+/** Fetch model ids from an OpenAI-compatible `/models` endpoint; [] on any failure. */
+async function fetchModelIds(url: string, headers: Record<string, string>, backend: Backend): Promise<string[]> {
   try {
-    const res = await fetch("https://api.deepseek.com/models", { headers: { Authorization: `Bearer ${key}` } });
-    if (!res.ok) return fallback;
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      log("models.list.http", { backend, status: res.status });
+      return [];
+    }
     const data = (await res.json()) as { data?: { id?: string }[] };
     const ids = (data.data ?? []).map((d) => d.id).filter((x): x is string => !!x);
     log("models.list", { backend, n: ids.length });
-    return ids.length ? ids.sort() : fallback;
+    return ids;
   } catch (e) {
     log("models.list.error", { backend, err: String(e) });
-    return fallback;
+    return [];
   }
+}
+
+// Claude's selectable models. The CLI's --model accepts these full ids (and the [1m] 1M-context
+// variants), so the picker can offer the same set the official Claude Code menu shows.
+const CLAUDE_MODELS: ModelOption[] = [
+  { id: "claude-opus-4-8", label: "Opus 4.8" },
+  { id: "claude-opus-4-8[1m]", label: "Opus 4.8 (1M context)" },
+  { id: "claude-sonnet-4-6", label: "Sonnet 4.6" },
+  { id: "claude-haiku-4-5", label: "Haiku 4.5" },
+  { id: "claude-opus-4-7", label: "Opus 4.7 (Legacy)" },
+  { id: "claude-opus-4-7[1m]", label: "Opus 4.7 (1M context, Legacy)" },
+  { id: "claude-opus-4-6", label: "Opus 4.6 (Legacy)" },
+];
+
+/** Read Codex's own model cache (`~/.codex/models_cache.json`) — the list `codex -m` accepts. */
+function codexModels(): ModelOption[] {
+  try {
+    const p = join(homedir(), ".codex", "models_cache.json");
+    if (!existsSync(p)) return [];
+    const data = JSON.parse(readFileSync(p, "utf8")) as { models?: { slug?: string; display_name?: string; visibility?: string }[] };
+    const list = (data.models ?? [])
+      .filter((m) => m.visibility === "list" && !!m.slug)
+      .map((m) => ({ id: m.slug as string, label: m.display_name || (m.slug as string) }));
+    log("models.codex.cache", { n: list.length });
+    return list;
+  } catch (e) {
+    log("models.codex.cache.error", { err: String(e) });
+    return [];
+  }
+}
+
+/**
+ * Selectable models for a backend. Codex comes from its local cache (kept fresh by Codex itself),
+ * DeepSeek/Anthropic are fetched live in api-key mode (so new models like DeepSeek V4 appear
+ * automatically), and Claude has a curated list mirroring the official picker.
+ */
+async function listModels(backend: Backend): Promise<ModelOption[]> {
+  const key = apiKeyFor(backend);
+  const usingKey = connectMethodFor(backend) === "key" && !!key;
+  const toOptions = (ids: string[]): ModelOption[] => ids.map((id) => ({ id, label: id }));
+
+  if (backend === "deepseek") {
+    const fallback = toOptions(["deepseek-chat", "deepseek-reasoner"]);
+    if (!key) return fallback;
+    const ids = await fetchModelIds("https://api.deepseek.com/models", { Authorization: `Bearer ${key}` }, backend);
+    return ids.length ? toOptions(ids.sort()) : fallback;
+  }
+
+  if (backend === "claude") {
+    if (!usingKey) return CLAUDE_MODELS; // app login → curated set (the CLI accepts these ids)
+    // api-key mode: keep the curated set, append any newer ids the live API reports
+    const ids = await fetchModelIds("https://api.anthropic.com/v1/models", { "x-api-key": key, "anthropic-version": "2023-06-01" }, backend);
+    const known = new Set(CLAUDE_MODELS.map((m) => m.id));
+    const extra = toOptions(ids.filter((id) => !known.has(id)).sort().reverse());
+    return [...CLAUDE_MODELS, ...extra];
+  }
+
+  // codex — its CLI takes the slugs from its own cache regardless of auth mode
+  const codex = codexModels();
+  if (codex.length) return codex;
+  if (usingKey) {
+    const ids = await fetchModelIds("https://api.openai.com/v1/models", { Authorization: `Bearer ${key}` }, backend);
+    const chat = ids.filter((id) => /^(?:gpt-|o\d|chatgpt|codex)/.test(id));
+    return toOptions((chat.length ? chat : ids).sort().reverse());
+  }
+  return codex; // empty → the picker falls back to a free-text field
 }
 
 function capture(path: string): void {
@@ -470,6 +539,13 @@ app.whenReady().then(() => {
     const st = await connectAgent(kind);
     send(CH.authEvent, sessionAuth);
     return st;
+  });
+  // Soft disconnect: forget the connection in-app only. We deliberately do NOT run the CLI
+  // logout, so the user's global `claude` / `codex` login (shared with their terminal) is kept.
+  ipcMain.handle(CH.authDisconnect, (_e, kind: AgentKind) => {
+    sessionAuth[kind] = { connected: false };
+    log("auth.disconnect", { kind });
+    send(CH.authEvent, sessionAuth);
   });
 
   // ---- history & search ----

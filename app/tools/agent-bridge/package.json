@@ -1,0 +1,10 @@
+{
+  "name": "agentstudio-agent-bridge",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Node sidecar: drives the Claude Agent SDK for AgentStudio's Anthropic-key lane (Plan B)",
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "latest"
+  }
+}

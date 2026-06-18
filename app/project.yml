@@ -1,0 +1,83 @@
+name: AgentStudio
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: "2.6.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: ""   # set your 10-char Apple Developer Team ID for distribution (or sign only via tools/notarize.sh)
+    CODE_SIGN_STYLE: Manual
+  configs:
+    # Local dev: ad-hoc sign, no hardened runtime — the .app launches without a paid team.
+    Debug:
+      CODE_SIGN_IDENTITY: "-"
+      ENABLE_HARDENED_RUNTIME: NO
+    # Distribution (Developer ID + notarization): hardened runtime is required by notarytool.
+    # tools/notarize.sh re-signs the built .app with your Developer ID, so the identity here is
+    # just a hint — leave "-" if you only sign via the script.
+    Release:
+      CODE_SIGN_IDENTITY: "Developer ID Application"
+      ENABLE_HARDENED_RUNTIME: YES
+
+targets:
+  AgentStudio:
+    type: application
+    platform: macOS
+    sources:
+      - path: AgentStudio
+    dependencies:
+      - package: Sparkle
+    scheme:
+      testTargets:
+        - AgentStudioTests
+    # XcodeGen-managed Info.plist (auto-fills CFBundle* basics; we add the extras + Sparkle keys).
+    info:
+      path: AgentStudio/Info.plist
+      properties:
+        CFBundleDisplayName: AgentStudio
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSApplicationCategoryType: public.app-category.developer-tools
+        NSHumanReadableCopyright: "© 2026 The AgentStudio Authors"
+        LSMinimumSystemVersion: "14.0"
+        # ── Sparkle auto-update (Developer ID distribution) ──
+        # SUFeedURL: where you host appcast.xml. SUPublicEDKey: the public key printed by
+        # Sparkle's `generate_keys` (the private key stays in your login Keychain). See RELEASE.md.
+        SUFeedURL: https://example.com/agentstudio/appcast.xml
+        SUPublicEDKey: REPLACE_WITH_SPARKLE_PUBLIC_KEY
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.agentstudio
+        PRODUCT_NAME: AgentStudio
+        CODE_SIGN_ENTITLEMENTS: AgentStudio/AgentStudio.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: YES
+        COMBINE_HIDPI_IMAGES: YES
+
+  AgentStudioTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: AgentStudioTests
+    dependencies:
+      - target: AgentStudio
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.agentstudio.tests
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: NO

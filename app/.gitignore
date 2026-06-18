@@ -1,0 +1,16 @@
+# XcodeGen output (regenerate with `xcodegen generate`)
+AgentStudio.xcodeproj/
+AgentStudio/Info.plist
+
+# Build / release artifacts
+build/
+dist/
+DerivedData/
+*.dmg
+*.zip
+
+# Local test credentials (real provider keys — never commit)
+tools/test.env
+
+# macOS
+.DS_Store

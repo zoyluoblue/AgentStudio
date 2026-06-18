@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Distribution: Developer ID + notarization (NOT the Mac App Store).
+	  The app is intentionally NOT sandboxed — it spawns the user's local claude/codex
+	  CLIs and dev servers (npm/python) and reads/writes the chosen project folder freely,
+	  none of which the App Sandbox permits. Hardened runtime (required by notarization)
+	  is enabled for the Release config; spawning separate child processes needs no extra
+	  cs.* exception (library validation only restricts code loaded into THIS process).
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+</dict>
+</plist>
